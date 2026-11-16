@@ -13,10 +13,17 @@
     <a class="back" href="../../">← ゲーム一覧</a>
     <header>
       <h1>ピアノ音当て</h1>
-      <p>ピアノ風の音を聴いて、鳴った音をオクターブまで当てよう。</p>
+      <p>ピアノ風の音を聴いて、鳴った音を当てよう。</p>
     </header>
     <section id="setup" class="panel" aria-label="モード選択">
-      <h2>出題モード</h2>
+      <h2>難易度</h2>
+      <select id="difficulty" aria-label="難易度" aria-describedby="difficulty-description">
+        <option value="one-octave">1オクターブ</option>
+        <option value="pitch-class">音名のみ</option>
+        <option value="advanced">上級</option>
+      </select>
+      <p id="difficulty-description" aria-live="polite">中央のド（C4）からシ（B4）までの12音から出題します。</p>
+      <h2>練習モード</h2>
       <p>選んだ音数で、何問でも練習できます。</p>
       <div class="practice-controls">
         <label for="note-count">音数</label>
@@ -38,7 +45,10 @@
         <h2 id="question" tabindex="-1"></h2>
         <p id="score"></p>
       </div>
-      <button id="play" class="primary" type="button">出題音を聴く</button>
+      <div class="listen-actions">
+        <button id="play" class="primary" type="button">出題音を聴く</button>
+        <button id="reference" type="button">基準音 ド4</button>
+      </div>
       <fieldset id="choices" disabled>
         <legend id="selection-count"></legend>
         <div id="octaves"></div>

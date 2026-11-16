@@ -72,6 +72,12 @@
   font-weight: 700;
 }
 
+.listen-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .5rem;
+}
+
 .chords fieldset {
   margin: 1.25rem 0 0;
   padding: 0;

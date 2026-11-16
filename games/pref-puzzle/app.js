@@ -5,6 +5,8 @@
   const cv = $('game'), ctx = cv.getContext('2d'), wrap = $('canvas-wrap'), button = $('shuffle');
   const game = new PuzzleCore.Puzzle(M, PREFECTURE_DATA);
   const effects = new PuzzleEffects($('effects'), $('complete-celebration'));
+  const sound = new PuzzleSound(), soundButton = $('sound');
+  const falling = new WeakSet(), landings = new Map();
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let displayedScore = 0, scorePulse = null;
   let regionQueue = [], regionUntil = null;
@@ -13,8 +15,51 @@
   try { best = Number(localStorage.getItem('pref-puzzle-best')) || 0; } catch {}
   $('best').textContent = best.toLocaleString('ja-JP');
 
+  function updateSoundButton() {
+    soundButton.textContent = sound.supported ? `効果音 ${sound.enabled ? 'ON' : 'OFF'}` : '効果音 非対応';
+    soundButton.setAttribute('aria-pressed', String(sound.enabled));
+    soundButton.disabled = !sound.supported;
+  }
+  soundButton.addEventListener('click', () => { sound.toggle(); updateSoundButton(); });
+  updateSoundButton();
+
+  function unlockSound() {
+    sound.unlock();
+    if (!sound.supported) updateSoundButton();
+  }
+
+  function drop() {
+    unlockSound();
+    if (game.drop()) falling.add(game.groups.at(-1).body);
+  }
+
+  M.Events.on(game.engine, 'collisionStart', ({ pairs }) => {
+    if (!sound.enabled) return;
+    for (const { bodyA, bodyB, collision } of pairs) {
+      const a = bodyA.parent, b = bodyB.parent;
+      if (!falling.has(a) && !falling.has(b)) continue;
+      const floor = game.walls.at(-1);
+      const { x, y } = collision.normal;
+      const speed = Math.abs((a.velocity.x - b.velocity.x) * x + (a.velocity.y - b.velocity.y) * y);
+      if (speed < 2.2) continue;
+      if (falling.has(a) && (b.group || b === floor)) landings.set(a, Math.max(landings.get(a) || 0, speed));
+      if (falling.has(b) && (a.group || a === floor)) landings.set(b, Math.max(landings.get(b) || 0, speed));
+    }
+  });
+
+  function playLandings() {
+    let strongest = 0;
+    for (const [body, speed] of landings) {
+      falling.delete(body);
+      if (game.groups.includes(body.group)) strongest = Math.max(strongest, speed);
+    }
+    landings.clear();
+    if (strongest) sound.land(strongest);
+  }
+
   function resetHold() {
     game.setShuffling(false);
+    sound.releaseShuffle();
     holdingPointer = null;
     holdKey = null;
     button.classList.remove('holding');
@@ -55,6 +100,7 @@
 
   function start() {
     resetHold();
+    sound.stop();
     clearTimeout(resetTimer);
     resetTimer = 0;
     $('reset').classList.remove('armed');
@@ -81,7 +127,10 @@
     ], { duration: 480, easing: 'ease-out' });
   }
   game.onMerge = (count, points, group, regions = []) => {
-    if (!regions.length) announce(`${count}県合体`);
+    if (!regions.length) {
+      announce(`${count}県合体`);
+      sound.merge(count);
+    }
     points += regions.reduce((sum, region) => sum + region.bonus, 0);
     const rect = cv.getBoundingClientRect(), scale = rect.width / game.width;
     effects.score(points, rect.left + group.body.position.x * scale,
@@ -90,6 +139,7 @@
   };
   game.onRegionComplete = region => {
     if (game.completeAt !== null) return;
+    sound.region();
     clearTimeout(toastTimer); $('toast').classList.remove('show');
     regionQueue.push(region);
     updateRegionNotice();
@@ -97,6 +147,7 @@
   };
   game.onComplete = (round, bonus) => {
     resetHold();
+    sound.complete();
     clearRegionNotices();
     clearTimeout(toastTimer); $('toast').classList.remove('show');
     $('complete-round').textContent = `${round}周目`;
@@ -108,7 +159,7 @@
     pulseScore();
   };
   game.onRound = round => {
-    resetHold(); effects.reset(); announce(`${round}周目`);
+    resetHold(); sound.stop(); effects.reset(); announce(`${round}周目`);
     updateUI(); cv.focus({ preventScroll: true });
   };
 
@@ -259,7 +310,7 @@
     if (aiming !== e.pointerId) return;
     aim(e); aiming = null;
     const rect = cv.getBoundingClientRect();
-    if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) game.drop();
+    if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) drop();
     updateUI();
   });
   cv.addEventListener('pointercancel', () => { aiming = null; });
@@ -268,13 +319,13 @@
     if (paused) return;
     if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
       game.setAim(game.aim + (e.code === 'ArrowLeft' ? -18 : 18)); e.preventDefault();
-    } else if (e.code === 'Space' || e.code === 'Enter') { if (!e.repeat) game.drop(); e.preventDefault(); }
+    } else if (e.code === 'Space' || e.code === 'Enter') { if (!e.repeat) drop(); e.preventDefault(); }
   });
 
   button.addEventListener('pointerdown', e => {
     if (button.disabled || e.button !== 0 || holdingPointer !== null || holdKey) return;
     e.preventDefault(); holdingPointer = e.pointerId; button.setPointerCapture(e.pointerId);
-    game.setShuffling(true); updateUI();
+    unlockSound(); game.setShuffling(true); updateUI();
   });
   button.addEventListener('pointermove', e => {
     if (holdingPointer !== e.pointerId) return;
@@ -288,7 +339,7 @@
   button.addEventListener('keydown', e => {
     if (!['Space', 'Enter'].includes(e.code)) return;
     e.preventDefault(); if (e.repeat || button.disabled || holdKey || holdingPointer !== null) return;
-    holdKey = e.code; game.setShuffling(true); updateUI();
+    holdKey = e.code; unlockSound(); game.setShuffling(true); updateUI();
   });
   button.addEventListener('keyup', e => { if (e.code === holdKey) { e.preventDefault(); resetHold(); } });
   button.addEventListener('blur', resetHold);
@@ -301,7 +352,7 @@
   $('next-round').addEventListener('click', () => game.nextRound());
   for (const [trigger, id] of [['help', 'help-dialog'], ['credits', 'credits-dialog']]) {
     const dialog = $(id);
-    $(trigger).addEventListener('click', () => { paused = true; aiming = null; resetHold(); dialog.showModal(); });
+    $(trigger).addEventListener('click', () => { paused = true; aiming = null; resetHold(); sound.stop(); dialog.showModal(); });
     dialog.addEventListener('close', () => { paused = false; updateUI(); });
     dialog.querySelectorAll('.dialog-close,.dialog-close-action').forEach(b => b.addEventListener('click', () => dialog.close()));
     dialog.addEventListener('click', e => {
@@ -310,8 +361,8 @@
       if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) dialog.close();
     });
   }
-  window.addEventListener('blur', () => { resetHold(); aiming = null; });
-  document.addEventListener('visibilitychange', () => { resetHold(); aiming = null; last = 0; });
+  window.addEventListener('blur', () => { resetHold(); sound.stop(); aiming = null; });
+  document.addEventListener('visibilitychange', () => { resetHold(); sound.stop(); aiming = null; last = 0; });
   let last = 0, acc = 0;
   function frame(now) {
     const dt = Math.min(70, last ? now - last : 1000 / 60); last = now;
@@ -319,6 +370,8 @@
       acc += dt; let steps = 0;
       while (acc >= 1000 / 60 && steps++ < 4) { game.step(); acc -= 1000 / 60; }
       if (steps >= 4) acc = 0;
+      playLandings();
+      if (game.shuffling) sound.shuffle(game.shuffleStrength());
     } else acc = 0;
     draw(); updateUI();
     displayedScore = reducedMotion ? game.score : displayedScore + (game.score - displayedScore) * (1 - Math.exp(-dt / 110));

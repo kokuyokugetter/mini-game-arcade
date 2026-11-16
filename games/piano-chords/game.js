@@ -1,7 +1,22 @@
 const totalQuestions = 10;
 const noteNames = ['ド', 'ド♯', 'レ', 'レ♯', 'ミ', 'ファ', 'ファ♯', 'ソ', 'ソ♯', 'ラ', 'ラ♯', 'シ'];
-const firstNote = 48; // MIDI C3
-const endNote = 84; // MIDI C6, excluded
+const octaveSize = noteNames.length;
+const middleC = 60;
+const octaveBases = [48, middleC, 72]; // C3, C4, C5
+const levels = {
+  'one-octave': {
+    answerBases: [middleC],
+    description: '中央のド（C4）からシ（B4）までの12音から出題します。',
+  },
+  'pitch-class': {
+    answerBases: [0],
+    description: '3オクターブから出題します。答えるのはド・レ・ミなどの音名だけです。',
+  },
+  advanced: {
+    answerBases: octaveBases,
+    description: '3オクターブから出題します。音名とオクターブを当てます。',
+  },
+};
 const partials = [
   { ratio: 1, volume: 0.13, fade: 1.45 },
   { ratio: 2, volume: 0.055, fade: 0.85 },
@@ -11,12 +26,15 @@ const partials = [
 ];
 
 const setup = document.querySelector('#setup');
+const difficulty = document.querySelector('#difficulty');
+const difficultyDescription = document.querySelector('#difficulty-description');
 const noteCountInput = document.querySelector('#note-count');
 const practice = document.querySelector('#practice');
 const game = document.querySelector('#game');
 const question = document.querySelector('#question');
 const scoreLabel = document.querySelector('#score');
 const play = document.querySelector('#play');
+const reference = document.querySelector('#reference');
 const choices = document.querySelector('#choices');
 const selectionCount = document.querySelector('#selection-count');
 const octaves = document.querySelector('#octaves');
@@ -32,6 +50,8 @@ const selection = new Set();
 let audio;
 let playback;
 let challengeMode;
+let level;
+let practiceCount;
 let round;
 let score;
 let target;
@@ -83,7 +103,8 @@ function playChord(notes) {
 }
 
 function noteName(note) {
-  return noteNames[note % 12] + (Math.floor(note / 12) - 1);
+  const name = noteNames[note % octaveSize];
+  return level === levels['pitch-class'] ? name : name + (Math.floor(note / octaveSize) - 1);
 }
 
 function updateSelection() {
@@ -91,43 +112,53 @@ function updateSelection() {
   submit.disabled = choices.disabled || selection.size !== target.length;
 }
 
-for (let base = firstNote; base < endNote; base += 12) {
-  const heading = document.createElement('h3');
-  heading.textContent = `オクターブ ${Math.floor(base / 12) - 1}`;
-  const keys = document.createElement('div');
-  keys.className = 'keys';
-  for (let note = base; note < base + 12; note += 1) {
-    const key = document.createElement('button');
-    key.type = 'button';
-    key.textContent = noteName(note);
-    key.classList.toggle('sharp', key.textContent.includes('♯'));
-    key.setAttribute('aria-pressed', 'false');
-    key.addEventListener('click', () => {
-      if (selection.has(note)) {
-        selection.delete(note);
-      } else if (selection.size < target.length) {
-        selection.add(note);
-      } else {
-        feedback.textContent = '選び直すには、選択済みの音を押して外してください。';
-        return;
-      }
-      key.setAttribute('aria-pressed', String(selection.has(note)));
-      feedback.textContent = '';
-      updateSelection();
-    });
-    noteButtons.set(note, key);
-    keys.append(key);
+function buildChoices() {
+  octaves.replaceChildren();
+  noteButtons.clear();
+  for (const base of level.answerBases) {
+    if (level !== levels['pitch-class']) {
+      const heading = document.createElement('h3');
+      heading.textContent = `オクターブ ${Math.floor(base / octaveSize) - 1}`;
+      octaves.append(heading);
+    }
+    const keys = document.createElement('div');
+    keys.className = 'keys';
+    for (let note = base; note < base + octaveSize; note += 1) {
+      const key = document.createElement('button');
+      key.type = 'button';
+      key.textContent = noteName(note);
+      key.classList.toggle('sharp', key.textContent.includes('♯'));
+      key.setAttribute('aria-pressed', 'false');
+      key.addEventListener('click', () => {
+        if (selection.has(note)) {
+          selection.delete(note);
+        } else if (selection.size < target.length) {
+          selection.add(note);
+        } else {
+          feedback.textContent = '選び直すには、選択済みの音を押して外してください。';
+          return;
+        }
+        key.setAttribute('aria-pressed', String(selection.has(note)));
+        feedback.textContent = '';
+        updateSelection();
+      });
+      noteButtons.set(note, key);
+      keys.append(key);
+    }
+    octaves.append(keys);
   }
-  octaves.append(heading, keys);
 }
 
 function showQuestion() {
   stopPlayback();
-  const count = challengeMode ? Math.ceil(round / 2) : Number(noteCountInput.value);
+  const count = challengeMode ? Math.ceil(round / 2) : practiceCount;
   const available = [...noteButtons.keys()];
   target = Array.from({ length: count }, () => {
     const index = Math.floor(Math.random() * available.length);
-    return available.splice(index, 1)[0];
+    const [answer] = available.splice(index, 1);
+    if (level !== levels['pitch-class']) return answer;
+    const base = octaveBases[Math.floor(Math.random() * octaveBases.length)];
+    return base + answer;
   }).sort((a, b) => a - b);
   const progress = challengeMode ? `第${round}問 / 全${totalQuestions}問` : `第${round}問`;
   question.textContent = `${progress} · ${count}音`;
@@ -145,41 +176,52 @@ function showQuestion() {
   next.hidden = true;
 }
 
-play.addEventListener('click', async () => {
+async function playNotes(notes) {
   const requested = target;
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) {
       feedback.textContent = 'このブラウザは音声再生に対応していません。';
-      return;
+      return false;
     }
     audio ??= new AudioContext();
     if (audio.state !== 'running') await audio.resume();
-    if (game.hidden || requested !== target) return;
-    playChord(target);
-    play.textContent = 'もう一度聴く';
-    if (next.hidden) {
-      choices.disabled = false;
-      feedback.textContent = '';
-      updateSelection();
-    }
+    if (game.hidden || requested !== target) return false;
+    playChord(notes);
+    return true;
   } catch {
     if (!game.hidden && requested === target) {
       feedback.textContent = '音を再生できませんでした。もう一度お試しください。';
     }
+    return false;
+  }
+}
+
+play.addEventListener('click', async () => {
+  if (!await playNotes(target)) return;
+  play.textContent = 'もう一度聴く';
+  if (next.hidden) {
+    choices.disabled = false;
+    feedback.textContent = '';
+    updateSelection();
   }
 });
 
+reference.addEventListener('click', () => playNotes([middleC]));
+
 submit.addEventListener('click', () => {
   choices.disabled = true;
-  const correct = target.every((note) => selection.has(note));
+  const answers = level === levels['pitch-class']
+    ? target.map((note) => note % octaveSize)
+    : target;
+  const correct = answers.every((note) => selection.has(note));
   if (correct) score += 1;
   scoreLabel.textContent = `${score}点`;
   for (const [note, key] of noteButtons) {
-    if (target.includes(note)) key.classList.add('correct');
+    if (answers.includes(note)) key.classList.add('correct');
     else if (selection.has(note)) key.classList.add('incorrect');
   }
-  const answer = target.map(noteName).join('、');
+  const answer = answers.map(noteName).join('、');
   feedback.textContent = correct ? `正解！ ${answer}` : `不正解。正解は ${answer} です。`;
   submit.hidden = true;
   next.textContent = challengeMode && round === totalQuestions ? '結果を見る' : '次の問題へ';
@@ -209,6 +251,7 @@ function startGame(random) {
   setup.hidden = true;
   result.hidden = true;
   game.hidden = false;
+  buildChoices();
   showQuestion();
   question.focus();
 }
@@ -221,8 +264,20 @@ function showSetup() {
   (challengeMode ? document.querySelector('#challenge') : practice).focus();
 }
 
-practice.addEventListener('click', () => startGame(false));
-document.querySelector('#challenge').addEventListener('click', () => startGame(true));
+function startFromSetup(random) {
+  level = levels[difficulty.value];
+  practiceCount = Number(noteCountInput.value);
+  startGame(random);
+}
+
+function describeDifficulty() {
+  difficultyDescription.textContent = levels[difficulty.value].description;
+}
+
+describeDifficulty();
+difficulty.addEventListener('change', describeDifficulty);
+practice.addEventListener('click', () => startFromSetup(false));
+document.querySelector('#challenge').addEventListener('click', () => startFromSetup(true));
 document.querySelector('#restart').addEventListener('click', () => startGame(true));
 document.querySelector('#back-to-setup').addEventListener('click', showSetup);
 document.querySelector('#result-to-setup').addEventListener('click', showSetup);
