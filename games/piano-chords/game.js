@@ -1,5 +1,5 @@
 const totalQuestions = 10;
-const noteNames = ['ド', 'ド♯', 'レ', 'レ♯', 'ミ', 'ファ', 'ファ♯', 'ソ', 'ソ♯', 'ラ', 'ラ♯', 'シ'];
+const noteNames = ['ド', 'レ♭', 'レ', 'ミ♭', 'ミ', 'ファ', 'ソ♭', 'ソ', 'ラ♭', 'ラ', 'シ♭', 'シ'];
 const octaveSize = noteNames.length;
 const middleC = 60;
 const octaveBases = [48, middleC, 72]; // C3, C4, C5
@@ -127,7 +127,7 @@ function buildChoices() {
       const key = document.createElement('button');
       key.type = 'button';
       key.textContent = noteName(note);
-      key.classList.toggle('sharp', key.textContent.includes('♯'));
+      key.classList.toggle('black-key', key.textContent.includes('♭'));
       key.setAttribute('aria-pressed', 'false');
       key.addEventListener('click', () => {
         if (selection.has(note)) {
