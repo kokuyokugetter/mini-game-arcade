@@ -1,6 +1,6 @@
 # ミニゲームアーケード
 
-ブラウザで遊べる静的なミニゲーム集。最初の掲載候補は、別プロジェクトの都道府県パズル。以降のゲームは追加時に決める。
+ブラウザで遊べる静的なミニゲーム集。
 
 ## 構成
 
@@ -16,7 +16,11 @@
 | 共有先 | URL |
 | --- | --- |
 | アーケードのトップ | `https://<owner>.github.io/mini-game-arcade/` |
-| 都道府県パズルを同梱した場合 | `https://<owner>.github.io/mini-game-arcade/games/pref-puzzle/` |
+| 都道府県パズル | `https://<owner>.github.io/mini-game-arcade/games/pref-puzzle/` |
+| ピアノ音当て | `https://<owner>.github.io/mini-game-arcade/games/piano-chords/` |
+| 境界の魔王 | `https://<owner>.github.io/mini-game-arcade/games/bug-quest/` |
+| リム・ブレイカー | `https://<owner>.github.io/mini-game-arcade/games/rim-breaker/` |
+| スッキリ洗浄室 | `https://<owner>.github.io/mini-game-arcade/games/cleaning-room/` |
 
 トップからは `./games/pref-puzzle/`、ゲームの入口からトップへは `../../` を使う。ゲーム内の素材も `./style.css` のような相対パスで参照する。先頭が `/` のパスはリポジトリ名の階層を飛ばすため、サイト内リンクには使わない。SNS や GitHub のリポジトリ概要欄には、公開後に確認したトップまたはゲーム個別の完全な URL を貼る。
 
@@ -24,17 +28,19 @@
 
 ## 都道府県パズルの取り込み
 
-手元の `../pref-puzzle/` には静的配信用の `dist/` がある。同梱する場合は、出典と同梱ライブラリのライセンス表記を引き継ぎ、`dist/` の中身を `games/pref-puzzle/` に配置する。ローカルで起動と操作を確認してから、トップの準備中表示を「遊ぶ」リンクに切り替える。同梱版を更新するときは、元プロジェクトから配信用ファイルを取り直す。
+`../pref-puzzle/dist/` を `games/pref-puzzle/` に同梱している。出典とライセンスはゲーム内の「地図・ライセンス」および同梱ライブラリに記載されている。更新時は元プロジェクトから配信用ファイルを取り直し、ゲーム一覧へ戻るリンク（`../../`）を引き継ぐ。
 
 ## ローカルで確認
 
-リポジトリの1つ上のフォルダを配信すると、GitHub Pages と同様に `/mini-game-arcade/` 配下でパスを確認できる。
+Python 3 が入った環境で、リポジトリのルートから起動する。サーバーは自分の端末でのみアクセスでき、GitHub Pages と同じ `/mini-game-arcade/` 配下で確認できる。
 
 ```sh
-python3 -m http.server 8000 --bind 127.0.0.1 --directory ..
+python3 serve.py
 ```
 
-ブラウザで `http://127.0.0.1:8000/mini-game-arcade/` を開く。ゲーム追加時は一覧からの遷移、個別 URL の直接アクセス、素材の読み込みを確認する。
+ブラウザで [ゲーム一覧](http://127.0.0.1:8000/mini-game-arcade/) を開く。ゲーム追加時は、一覧からの遷移、個別 URL（例 [スッキリ洗浄室](http://127.0.0.1:8000/mini-game-arcade/games/cleaning-room/)）の直接アクセス、素材の読み込みを確認する。
+
+ポート 8000 が使用中の場合は `python3 serve.py --port 8001` で起動し、表示された URL を開く。停止は起動したターミナルで `Ctrl+C`。
 
 ## GitHub Pages に公開する手順
 

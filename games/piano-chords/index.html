@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ピアノ音当て | ミニゲームアーケード</title>
+  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./game.js" defer></script>
+</head>
+<body>
+  <main class="chords">
+    <a class="back" href="../../">← ゲーム一覧</a>
+    <header>
+      <h1>ピアノ音当て</h1>
+      <p>ピアノ風の音を聴いて、鳴った音をオクターブまで当てよう。</p>
+    </header>
+    <section id="setup" class="panel" aria-label="モード選択">
+      <h2>出題モード</h2>
+      <p>選んだ音数で、何問でも練習できます。</p>
+      <div class="practice-controls">
+        <label for="note-count">音数</label>
+        <select id="note-count">
+          <option value="1">1音</option>
+          <option value="2">2音</option>
+          <option value="3">3音</option>
+          <option value="4">4音</option>
+          <option value="5">5音</option>
+        </select>
+        <button id="practice" class="primary" type="button">練習を始める</button>
+      </div>
+      <h2>ランダムモード</h2>
+      <p>全10問。2問ごとに1音増え、最大5音になります。</p>
+      <button id="challenge" class="primary" type="button">10問に挑戦</button>
+    </section>
+    <section id="game" class="panel" aria-label="音当てクイズ" hidden>
+      <div class="stats">
+        <h2 id="question" tabindex="-1"></h2>
+        <p id="score"></p>
+      </div>
+      <button id="play" class="primary" type="button">出題音を聴く</button>
+      <fieldset id="choices" disabled>
+        <legend id="selection-count"></legend>
+        <div id="octaves"></div>
+      </fieldset>
+      <p id="feedback" role="status"></p>
+      <div class="actions">
+        <button id="submit" type="button" disabled>答える</button>
+        <button id="next" type="button" hidden>次の問題へ</button>
+        <button id="back-to-setup" type="button">モード選択へ</button>
+      </div>
+    </section>
+    <section id="result" class="panel" aria-labelledby="result-title" hidden>
+      <h2 id="result-title" tabindex="-1">結果</h2>
+      <p id="final-score"></p>
+      <div class="actions">
+        <button id="restart" class="primary" type="button">もう一度挑戦</button>
+        <button id="result-to-setup" type="button">モード選択へ</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

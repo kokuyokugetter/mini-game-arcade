@@ -1,0 +1,158 @@
+.chords {
+  max-width: 36rem;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 1rem;
+}
+
+.chords header {
+  margin-bottom: 1.5rem;
+}
+
+.panel {
+  padding: clamp(1rem, 5vw, 2rem);
+  border: 1px solid #56506c;
+  border-radius: 1rem;
+  background: #272338;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .25rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.stats h2 {
+  font-size: 1.125rem;
+}
+
+.stats p {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.chords button,
+.chords select {
+  min-height: 2.75rem;
+  padding: .65rem .85rem;
+  border: 1px solid #8b82a8;
+  border-radius: .5rem;
+  color: inherit;
+  background: #343049;
+  font: inherit;
+  cursor: pointer;
+}
+
+.chords button:hover:not(:disabled) {
+  border-color: #ffca6e;
+}
+
+.chords button:focus-visible,
+.chords select:focus-visible,
+.back:focus-visible {
+  outline: 2px solid #ffca6e;
+  outline-offset: 3px;
+}
+
+.chords button:disabled {
+  opacity: .72;
+  cursor: default;
+}
+
+.chords button.primary {
+  width: 100%;
+  color: #211714;
+  background: #ffca6e;
+  border-color: #ffca6e;
+  font-weight: 700;
+}
+
+.chords fieldset {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.chords legend {
+  margin-bottom: .5rem;
+}
+
+#setup h2 {
+  font-size: 1.25rem;
+}
+
+#setup h2:not(:first-child) {
+  margin-top: 1.5rem;
+}
+
+#challenge {
+  margin-top: .75rem;
+}
+
+.practice-controls,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .75rem;
+}
+
+.practice-controls .primary,
+.actions .primary {
+  width: auto;
+}
+
+#octaves h3 {
+  margin-bottom: .3rem;
+  color: #ccc7dc;
+  font-size: .875rem;
+}
+
+.keys + h3 {
+  margin-top: .75rem;
+}
+
+.keys {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: .3rem;
+}
+
+.chords .keys button {
+  padding: .4rem 0;
+  font-size: clamp(.75rem, 3vw, .95rem);
+  color: #272338;
+  background: #f8f6ed;
+}
+
+.chords .keys button.sharp {
+  color: #f8f6ed;
+  background: #191727;
+}
+
+.chords .keys button[aria-pressed="true"] {
+  color: #211714;
+  background: #ffca6e;
+  border-color: #ffca6e;
+}
+
+.chords .keys button.correct {
+  color: #e2ffea;
+  border-color: #afffc6;
+  background: #235039;
+  opacity: 1;
+}
+
+.chords .keys button.incorrect {
+  color: #ffe3e3;
+  border-color: #ffb1b1;
+  background: #683640;
+  opacity: 1;
+}

@@ -1,0 +1,238 @@
+:root {
+  color-scheme: light;
+  color: #123637;
+  background: #eaf5ef;
+  font-family: "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+}
+
+main {
+  max-width: 40rem;
+  padding-block: clamp(.75rem, 3vh, 2rem);
+}
+
+nav, .station-head, .station-foot, .pressure > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+a {
+  color: #245a59;
+  text-underline-offset: .2em;
+  font-size: .88rem;
+}
+
+header {
+  margin: .85rem 0 1.1rem;
+  padding: 0;
+  border: 0;
+}
+
+h1 {
+  font-size: clamp(1.95rem, 8vw, 3.45rem);
+  font-weight: 900;
+  letter-spacing: -.065em;
+}
+
+h1 span {
+  color: #087d75;
+}
+
+header p, .help {
+  color: #446764;
+  font-size: .88rem;
+}
+
+.station {
+  overflow: hidden;
+  border: 1px solid #bbd6cd;
+  border-radius: 1rem;
+  background: #fbfffc;
+  box-shadow: 0 10px 25px #183f2d12;
+}
+
+.station-head, .station-foot {
+  padding: .6rem clamp(.65rem, 3vw, 1.05rem);
+}
+
+.station-head h2 {
+  font-size: clamp(1rem, 5vw, 1.3rem);
+  line-height: 1.25;
+}
+
+.job-number {
+  margin: 0 0 .2rem;
+  color: #47736e;
+  font-size: .74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.completion {
+  flex: 0 1 7.5rem;
+  min-width: 4.6rem;
+  text-align: end;
+}
+
+output {
+  display: block;
+  color: #08675d;
+  font-size: clamp(1.25rem, 5vw, 1.85rem);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+output small {
+  margin-inline-start: .09em;
+  font-size: .58em;
+}
+
+progress {
+  display: block;
+  width: 100%;
+  height: .38rem;
+  margin-top: .35rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 1rem;
+  color: #098171;
+  background: #daede5;
+  accent-color: #098171;
+}
+
+progress::-webkit-progress-bar {
+  background: #daede5;
+}
+
+progress::-webkit-progress-value {
+  border-radius: inherit;
+  background: #098171;
+}
+
+progress::-moz-progress-bar {
+  border-radius: inherit;
+  background: #098171;
+}
+
+.screen {
+  position: relative;
+  background: #a4c3b8;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+canvas:focus-visible {
+  outline: 3px solid #083e4b;
+  outline-offset: -5px;
+}
+
+button {
+  min-height: 2.65rem;
+  padding: .35rem .7rem;
+  border: 1px solid #9ebfb6;
+  border-radius: .55rem;
+  color: #18534c;
+  background: #f5fff9;
+  font: 750 .85rem/1.25 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+button:disabled {
+  color: #55716d;
+  background: #e9f3ed;
+  cursor: default;
+}
+
+button:focus-visible, a:focus-visible {
+  outline: 2px solid #096778;
+  outline-offset: 3px;
+}
+
+kbd {
+  margin-left: .25em;
+  font-size: .8em;
+  opacity: .82;
+}
+
+.pressure {
+  flex: 0 1 10rem;
+  color: #36615b;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+#burst:not(:disabled), #next {
+  border-color: #076c61;
+  color: #fff;
+  background: #076c61;
+}
+
+#burst[aria-pressed="true"] {
+  border-color: #8e4806;
+  background: #8e4806;
+}
+
+.finish {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  background: #e4f6ea87;
+}
+
+.finish[hidden] {
+  display: none;
+}
+
+.finish-card {
+  max-width: 85%;
+  padding: .7rem 1.5rem;
+  border: 1px solid #add7bf;
+  border-radius: .85rem;
+  background: #fcfff9;
+  box-shadow: 0 8px 28px #163d3b35;
+  text-align: center;
+}
+
+.finish-card svg {
+  color: #0a8d74;
+}
+
+.finish-card h2 {
+  font-size: clamp(1.2rem, 7vw, 2.15rem);
+}
+
+.finish-card h2:focus {
+  outline: none;
+}
+
+.finish-card p {
+  margin: .15rem 0 .6rem;
+  color: #315c55;
+  font-size: .85rem;
+}
+
+.status {
+  min-height: 1.5em;
+  margin-top: .75rem;
+  color: #205754;
+  font-weight: 700;
+  font-size: .93rem;
+}
+
+.help {
+  margin-top: .25rem;
+  font-size: .78rem;
+}
+
+@media (pointer: coarse) {
+  kbd { display: none; }
+}

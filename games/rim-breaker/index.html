@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>リム・ブレイカー | ミニゲームアーケード</title>
+  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./game.js" defer></script>
+</head>
+<body>
+  <main>
+    <nav><a href="../../">← ゲーム一覧</a><button id="sound" type="button" aria-pressed="false">効果音</button></nav>
+    <header>
+      <h1>リム・ブレイカー</h1>
+      <p>光る両端で返すと、着弾で爆発。中央で返せば軌道を抑えられる。</p>
+    </header>
+    <section class="cabinet" aria-label="リム・ブレイカーの操作画面">
+      <dl class="hud">
+        <div><dt>セクター</dt><dd id="sector">01</dd></div>
+        <div><dt>残機</dt><dd id="lives">3</dd></div>
+        <div><dt>スコア</dt><dd id="score">0</dd></div>
+        <div><dt>ベスト</dt><dd id="best">0</dd></div>
+      </dl>
+      <div class="playfield">
+        <canvas id="board" width="480" height="470" aria-label="ブロック崩しの盤面"></canvas>
+        <div id="overlay" class="overlay" hidden>
+          <section class="card" aria-labelledby="overlay-title">
+            <h2 id="overlay-title" tabindex="-1"></h2>
+            <p id="overlay-copy"></p>
+            <div id="choices"></div>
+          </section>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="action" type="button">発射</button>
+        <button id="pause" type="button">一時停止</button>
+        <p id="status" role="status">パドルを動かして、狙いを決めてから発射。</p>
+      </div>
+    </section>
+    <p class="help">移動は ← → キー、マウス、または盤面をドラッグ。Space で発射、P で一時停止。</p>
+  </main>
+</body>
+</html>
