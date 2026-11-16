@@ -35,6 +35,7 @@ const grime = maskCtx.createImageData(cols, rows);
 const layers = new Float32Array(cols * rows);
 const weights = new Float32Array(layers.length);
 const zoneIndex = new Uint8Array(layers.length);
+const stainIndex = new Uint8Array(layers.length);
 const cursor = { x: width / 2, y: height / 2 };
 const keys = new Set();
 const wet = [];
@@ -63,6 +64,10 @@ let surface;
 let zones;
 let total;
 let remaining;
+let dirtyCells;
+let stains;
+let holdStain;
+let heldFor;
 let pressure;
 let mode;
 let finishedAt;
@@ -125,8 +130,26 @@ function makeDirt(seed, recipe) {
   }));
   layers.fill(0);
   weights.fill(0);
+  stainIndex.fill(0);
   grime.data.fill(0);
   total = 0;
+  dirtyCells = 0;
+  stains = [];
+  const positions = [];
+  for (let y = 110; y <= 265; y += 51) {
+    for (let x = 135; x <= 441; x += 51) {
+      if (base.isPointInPath(surface.bounds, x, y)) positions.push({ x, y });
+    }
+  }
+  const kinds = stage === 1 ? ['hold', 'beat'] : ['hold', 'beat', stage % 2 ? 'hold' : 'beat'];
+  for (const kind of kinds) {
+    const index = Math.floor(random() * positions.length);
+    const [position] = positions.splice(index, 1);
+    stains.push({ ...position, kind, cells: [], hits: 0, pace: 0, lastBeat: -Infinity });
+    for (let i = positions.length - 1; i >= 0; i--) {
+      if (Math.hypot(positions[i].x - position.x, positions[i].y - position.y) < 85) positions.splice(i, 1);
+    }
+  }
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const x = (col + .5) * cell;
@@ -138,15 +161,23 @@ function makeDirt(seed, recipe) {
         if (distance < 2.5) stain += Math.exp(-distance * 1.65) * spot.intensity;
       }
       stain = clamp(stain * .63 + random() * .2 + Math.sin(x * .08 + y * .035) * .075, 0, 1);
+      const special = stains.findIndex((patch) => Math.hypot(x - patch.x, y - patch.y) < 23);
+      if (special >= 0) stain = Math.max(.79, stain);
       if (stain < .17) continue;
       const i = row * cols + col;
       const region = Math.floor(x * 5 / width) + Math.floor(y * 3 / height) * 5;
       const weight = (.28 + stain * 1.16) * resistance * recipe.weight;
       const tint = clamp((stain - .16) * 1.1 + random() * .3, 0, 1);
-      weights[i] = layers[i] = weight;
+      layers[i] = weight;
+      weights[i] = layers[i];
       zoneIndex[i] = region;
-      zones[region].total += weight;
-      total += weight;
+      zones[region].total += layers[i];
+      total += layers[i];
+      dirtyCells += 1;
+      if (special >= 0) {
+        stainIndex[i] = special + 1;
+        stains[special].cells.push(i);
+      }
       for (let channel = 0; channel < 3; channel++) {
         grime.data[i * 4 + channel] = light[channel] + (dark[channel] - light[channel]) * tint + random() * 10;
       }
@@ -207,6 +238,8 @@ function loadJob() {
   wet.length = drops.length = waves.length = 0;
   keys.clear();
   pointer = null;
+  holdStain = undefined;
+  heldFor = 0;
   aimVisible = false;
   cursor.x = width / 2;
   cursor.y = height / 2;
@@ -219,7 +252,7 @@ function loadJob() {
   job.textContent = surface.name;
   finish.hidden = true;
   canvas.tabIndex = 0;
-  say('汚れをなぞって洗い流そう。水圧が満タンになったら強力噴射。');
+  say('普通の汚れはなぞるだけ。マーク付きは長押し、または3拍で落とそう。');
   update();
 }
 
@@ -241,7 +274,7 @@ function detectZones(touched) {
   let cleared = false;
   for (const id of touched) {
     const zone = zones[id];
-    if (zone.done || zone.total < 8 || zone.remaining > zone.total * .07) continue;
+    if (zone.done || zone.total < 8 || zone.remaining > .0001) continue;
     zone.done = true;
     waves.push({ x: zone.x, y: zone.y, started: t, length: .42, radius: 50, kind: 'zone' });
     sprinkle(zone.x, zone.y, 12, '#a0f9df', 84);
@@ -251,6 +284,27 @@ function detectZones(touched) {
     nextImpact = t + .18;
     audio.chime();
   }
+}
+
+function removeDirt(i, force, touched) {
+  const before = layers[i];
+  const after = before - force;
+  layers[i] = after < .025 ? 0 : after;
+  if (layers[i] === 0) dirtyCells -= 1;
+  const change = before - layers[i];
+  const zone = zoneIndex[i];
+  zones[zone].remaining -= change;
+  touched.add(zone);
+  grime.data[i * 4 + 3] = alpha(layers[i], weights[i]);
+  return change;
+}
+
+function recordWash(removed, touched) {
+  if (removed <= 0) return;
+  remaining = Math.max(0, remaining - removed);
+  pressure = Math.min(100, pressure + removed / total * 410);
+  drawingDirty = true;
+  detectZones(touched);
 }
 
 function wash(x, y, radius, strength) {
@@ -263,28 +317,63 @@ function wash(x, y, radius, strength) {
   for (let row = lowY; row <= highY; row++) {
     for (let col = lowX; col <= highX; col++) {
       const i = row * cols + col;
-      const before = layers[i];
-      if (!before) continue;
+      if (!layers[i] || stainIndex[i]) continue;
       const distance = Math.hypot((col + .5) * cell - x, (row + .5) * cell - y) / radius;
       if (distance >= 1) continue;
-      const force = strength * (1 - distance * distance * .89);
-      const after = Math.max(0, before - force);
-      const actual = layers[i] = after < .025 ? 0 : after;
-      const change = before - actual;
-      removed += change;
-      const zone = zoneIndex[i];
-      zones[zone].remaining -= change;
-      touched.add(zone);
-      grime.data[i * 4 + 3] = alpha(actual, weights[i]);
+      removed += removeDirt(i, strength * (1 - distance * distance * .89), touched);
     }
   }
-  if (removed > 0) {
-    remaining = Math.max(0, remaining - removed);
-    pressure = Math.min(100, pressure + removed / total * 410);
-    drawingDirty = true;
-    detectZones(touched);
-  }
+  recordWash(removed, touched);
   return removed;
+}
+
+function stainAtCursor() {
+  return stains.find((patch) => patch.cells.length && Math.hypot(cursor.x - patch.x, cursor.y - patch.y) <= 30);
+}
+
+function clearStain(patch) {
+  const touched = new Set();
+  let removed = 0;
+  for (const i of patch.cells) removed += removeDirt(i, layers[i], touched);
+  patch.cells.length = 0;
+  recordWash(removed, touched);
+  sprinkle(patch.x, patch.y, 34, materials[surface.material].splash, 190);
+  waves.push({ x: patch.x, y: patch.y, started: t, length: .48, radius: 51, kind: 'burst' });
+  audio.burst();
+  say(patch.kind === 'hold' ? 'こびりつきが一気に剥がれた！' : 'リズム成功。汚れが一気に弾けた！');
+}
+
+function updateHold(elapsed) {
+  const target = stainAtCursor();
+  if (target !== holdStain) heldFor = 0;
+  holdStain = target?.kind === 'hold' ? target : undefined;
+  if (!holdStain) return;
+  heldFor += elapsed;
+  if (heldFor >= .7) {
+    clearStain(holdStain);
+    holdStain = undefined;
+    heldFor = 0;
+  } else {
+    say('こびりつき。その場で0.7秒押し続けると剥がれます。');
+  }
+}
+
+function tapStain() {
+  const patch = stainAtCursor();
+  if (patch?.kind !== 'beat') return;
+  const now = performance.now() / 1000;
+  const interval = now - patch.lastBeat;
+  const inTime = interval >= .18 && interval <= .65 &&
+    (patch.hits < 2 || Math.abs(interval - patch.pace) <= .16);
+  patch.lastBeat = now;
+  patch.hits = inTime ? patch.hits + 1 : 1;
+  patch.pace = patch.hits === 2 ? interval : 0;
+  if (patch.hits === 3) {
+    clearStain(patch);
+  } else {
+    audio.chime();
+    say(`リズム汚れ ${patch.hits}/3。同じ場所を一定の間隔でトン、トン、トン。`);
+  }
 }
 
 function samePointWash(x, y, elapsed) {
@@ -324,7 +413,7 @@ function washStroke(x, y) {
 
 function commitWash() {
   if (mode !== 'work') return;
-  if (remaining <= total * .025) finishJob();
+  if (dirtyCells === 0) finishJob();
   update();
 }
 
@@ -336,7 +425,7 @@ function burst() {
   announcedPressure = false;
   aimVisible = true;
   const { x, y } = cursor;
-  wash(x, y, 92, 5);
+  const removed = wash(x, y, 92, 5);
   waves.push({ x, y, started: t, length: .58, radius: 103, kind: 'burst' });
   for (let ring = 0; ring < 5; ring++) {
     const angle = ring * Math.PI * 2 / 5;
@@ -344,7 +433,7 @@ function burst() {
   }
   latestSpray = t + .12;
   audio.burst();
-  say('強力噴射で汚れが一気に落ちた。');
+  say(removed ? '強力噴射で汚れが一気に落ちた。' : 'この場所に強力噴射で落とせる汚れはありません。');
   commitWash();
 }
 
@@ -352,6 +441,8 @@ function stopInput() {
   if (pointer !== null && canvas.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
   pointer = null;
   keys.clear();
+  holdStain = undefined;
+  heldFor = 0;
   latestSpray = 0;
   audio.spray(false);
 }
@@ -372,6 +463,13 @@ function finishJob() {
 function animate(dt) {
   t += dt;
   if (mode === 'work') {
+    const clock = performance.now() / 1000;
+    for (const patch of stains) {
+      if (patch.cells.length && patch.kind === 'beat' && patch.hits && clock - patch.lastBeat > .65) {
+        patch.hits = 0;
+        redraw = true;
+      }
+    }
     const dx = Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'));
     const dy = Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'));
     const shooting = pointer !== null || keys.has('Space');
@@ -385,7 +483,11 @@ function animate(dt) {
     if (shooting) {
       latestSpray = t + .04;
       samePointWash(cursor.x, cursor.y, dt);
+      updateHold(dt);
       commitWash();
+    } else {
+      holdStain = undefined;
+      heldFor = 0;
     }
     audio.spray(mode === 'work' && shooting, soundResistance);
     soundResistance = Math.max(0, soundResistance - dt * 4);
@@ -425,25 +527,51 @@ function ring(x, y, radius, color, line = 2) {
   ctx.stroke();
 }
 
+function drawStains() {
+  if (remaining / total <= .1) {
+    for (let i = 0; i < layers.length; i++) {
+      if (!layers[i] || stainIndex[i]) continue;
+      const x = (i % cols + .5) * cell;
+      const y = (Math.floor(i / cols) + .5) * cell;
+      ctx.fillStyle = '#fff8e8';
+      ctx.fillRect(x - 3, y - 3, 6, 6);
+      ctx.fillStyle = '#cf3c22';
+      ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+    }
+  }
+  for (const patch of stains) {
+    if (!patch.cells.length) continue;
+    const { x, y, kind } = patch;
+    const hold = kind === 'hold';
+    const color = hold ? '#ffdb87' : '#f3c5ff';
+    ring(x, y, 25, '#322a30', 4);
+    ring(x, y, 25, color, 2);
+    if (patch === holdStain) {
+      ctx.beginPath();
+      ctx.arc(x, y, 25, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * heldFor / .7);
+      ctx.strokeStyle = '#fff9d5';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#322a30';
+    ctx.fillRect(x - 23, y - 9, 46, 18);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(hold ? '長押し' : `3拍 ${patch.hits}/3`, x, y);
+  }
+}
+
 function paint() {
   ctx.drawImage(surfaceCanvas, 0, 0);
-  if (mode === 'work' || mode === 'polish') {
-    if (drawingDirty) {
-      maskCtx.putImageData(grime, 0, 0);
-      drawingDirty = false;
-    }
+  if (drawingDirty) {
+    maskCtx.putImageData(grime, 0, 0);
+    drawingDirty = false;
+  }
+  if (mode === 'work') {
     ctx.save();
     ctx.clip(surface.bounds);
-    if (mode === 'polish') {
-      const sweep = (t - finishedAt) * (reduced.matches ? 7000 : 850) - 65;
-      ctx.beginPath();
-      ctx.moveTo(sweep + 76, 0);
-      ctx.lineTo(width, 0);
-      ctx.lineTo(width, height);
-      ctx.lineTo(sweep - 76, height);
-      ctx.closePath();
-      ctx.clip();
-    }
     ctx.drawImage(mask, 0, 0, cols * cell, rows * cell);
     ctx.restore();
   }
@@ -493,6 +621,7 @@ function paint() {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  if (mode === 'work') drawStains();
   if (mode === 'work' && aimVisible) {
     const { x, y } = cursor;
     const flowing = t < latestSpray;
@@ -544,6 +673,7 @@ canvas.addEventListener('pointerdown', (event) => {
   if (armed) {
     burst();
   } else {
+    tapStain();
     samePointWash(cursor.x, cursor.y, .036);
     commitWash();
   }
@@ -565,6 +695,9 @@ canvas.addEventListener('pointermove', (event) => {
 function endPointer(event) {
   if (pointer === event.pointerId) {
     pointer = null;
+    holdStain = undefined;
+    heldFor = 0;
+    redraw = true;
     audio.spray(keys.has('Space'));
   }
 }
@@ -587,12 +720,22 @@ canvas.addEventListener('keydown', (event) => {
     }
     keys.add(event.code);
     aimVisible = true;
-    if (event.code === 'Space' && !event.repeat) audio.unlock();
+    if (event.code === 'Space' && !event.repeat) {
+      audio.unlock();
+      tapStain();
+      commitWash();
+    }
   }
 });
 
 canvas.addEventListener('blur', () => keys.clear());
-document.addEventListener('keyup', (event) => keys.delete(event.code));
+document.addEventListener('keyup', (event) => {
+  if (keys.delete(event.code) && event.code === 'Space') {
+    holdStain = undefined;
+    heldFor = 0;
+    redraw = true;
+  }
+});
 window.addEventListener('blur', stopInput);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) stopInput();

@@ -1,7 +1,6 @@
 'use strict';
 
 const canvas = document.querySelector('#board');
-const cabinet = document.querySelector('.cabinet');
 const ctx = canvas.getContext('2d');
 const overlay = document.querySelector('#overlay');
 const title = document.querySelector('#overlay-title');
@@ -782,8 +781,11 @@ function pointPaddle(event) {
 }
 
 for (const type of ['contextmenu', 'selectstart']) {
-  cabinet.addEventListener(type, (event) => event.preventDefault());
+  document.addEventListener(type, (event) => event.preventDefault());
 }
+
+// Some iOS versions still handle long presses as native gestures despite touch-action.
+canvas.addEventListener('touchstart', (event) => event.preventDefault(), { passive: false });
 
 canvas.addEventListener('pointerdown', (event) => {
   if (!event.isPrimary || event.button !== 0 || (mode !== 'ready' && mode !== 'play')) return;
