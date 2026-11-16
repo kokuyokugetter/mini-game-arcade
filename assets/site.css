@@ -1,0 +1,56 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  color: #f8f6ed;
+  background: #191727;
+  line-height: 1.6;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 52rem;
+  margin-inline: auto;
+  padding: clamp(2rem, 8vw, 6rem) clamp(1rem, 5vw, 3rem);
+}
+
+header {
+  border-bottom: 2px solid #ffca6e;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 7vw, 3.75rem);
+  line-height: 1.2;
+}
+
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+p {
+  margin-top: .5rem;
+  color: #ccc7dc;
+}
+
+.games {
+  padding: 0;
+  list-style: none;
+}
+
+.games li {
+  padding: 1.25rem;
+  border: 1px solid #56506c;
+  border-radius: .75rem;
+  background: #272338;
+}
+
+a {
+  color: #ffca6e;
+}
