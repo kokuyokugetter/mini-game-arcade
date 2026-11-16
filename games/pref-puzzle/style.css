@@ -113,3 +113,14 @@ footer {
   outline: 3px solid #c39349;
   outline-offset: 2px;
 }
+
+#shuffle {
+  touch-action: none;
+}
+
+#shuffle,
+#shuffle * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}

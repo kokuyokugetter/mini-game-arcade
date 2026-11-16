@@ -335,7 +335,9 @@
   for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) button.addEventListener(event, e => {
     if (holdingPointer === e.pointerId) resetHold();
   });
-  button.addEventListener('contextmenu', e => e.preventDefault());
+  for (const event of ['contextmenu', 'selectstart']) {
+    button.addEventListener(event, e => e.preventDefault());
+  }
   button.addEventListener('keydown', e => {
     if (!['Space', 'Enter'].includes(e.code)) return;
     e.preventDefault(); if (e.repeat || button.disabled || holdKey || holdingPointer !== null) return;
