@@ -118,8 +118,8 @@ footer {
   touch-action: none;
 }
 
-#shuffle,
-#shuffle * {
+.game-layout,
+.game-layout * {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;

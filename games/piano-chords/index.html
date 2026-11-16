@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ピアノ音当て | ミニゲームアーケード</title>
-  <link rel="stylesheet" href="../../assets/site.css">
-  <link rel="stylesheet" href="./style.css?v=2">
-  <script src="./game.js?v=2" defer></script>
+  <link rel="stylesheet" href="../../assets/site.css?v=2">
+  <link rel="stylesheet" href="./style.css?v=3">
+  <script src="./game.js?v=3" defer></script>
 </head>
 <body>
   <main class="chords">
@@ -39,8 +39,11 @@
       <h2>ランダムモード</h2>
       <p>全10問。2問ごとに1音増え、最大5音になります。</p>
       <button id="challenge" class="primary" type="button">10問に挑戦</button>
+      <h2>鬼畜モード · ヘルツ当て</h2>
+      <p>40〜2,000 Hzの純音を10問。440 Hzを基準に、数字で周波数を当てます。</p>
+      <button id="frequency-start" class="primary" type="button">ヘルツ当てに挑戦</button>
     </section>
-    <section id="game" class="panel" aria-label="音当てクイズ" hidden>
+    <section id="game" class="panel game-surface" aria-label="音当てクイズ" hidden>
       <div class="stats">
         <h2 id="question" tabindex="-1"></h2>
         <p id="score"></p>
@@ -60,12 +63,36 @@
         <button id="back-to-setup" type="button">モード選択へ</button>
       </div>
     </section>
-    <section id="result" class="panel" aria-labelledby="result-title" hidden>
+    <section id="result" class="panel game-surface" aria-labelledby="result-title" hidden>
       <h2 id="result-title" tabindex="-1">結果</h2>
       <p id="final-score"></p>
       <div class="actions">
         <button id="restart" class="primary" type="button">もう一度挑戦</button>
         <button id="result-to-setup" type="button">モード選択へ</button>
+      </div>
+    </section>
+    <section id="frequency-game" class="panel game-surface" aria-labelledby="frequency-title" hidden>
+      <div class="stats">
+        <h2 id="frequency-title" tabindex="-1"></h2>
+        <p id="frequency-score"></p>
+      </div>
+      <div class="listen-actions">
+        <button id="frequency-play" class="primary" type="button">出題音を聴く</button>
+        <button id="frequency-reference" type="button">基準音 440 Hz</button>
+      </div>
+      <form id="frequency-answer">
+        <label for="frequency-guess">周波数（Hz）</label>
+        <div class="actions">
+          <input id="frequency-guess" type="number" min="40" max="2000" step="any" inputmode="decimal" required disabled aria-describedby="frequency-rule">
+          <button id="frequency-submit" type="submit" disabled>答える</button>
+        </div>
+        <p id="frequency-rule">±5%以内で正解。1問100点から誤差率に応じて減点します。</p>
+      </form>
+      <p id="frequency-feedback" role="status"></p>
+      <div class="actions">
+        <button id="frequency-next" type="button" hidden>次の問題へ</button>
+        <button id="frequency-retry" class="primary" type="button" hidden>もう一度挑戦</button>
+        <button id="frequency-exit" type="button">モード選択へ</button>
       </div>
     </section>
   </main>

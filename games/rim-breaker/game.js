@@ -1,6 +1,7 @@
 'use strict';
 
 const canvas = document.querySelector('#board');
+const cabinet = document.querySelector('.cabinet');
 const ctx = canvas.getContext('2d');
 const overlay = document.querySelector('#overlay');
 const title = document.querySelector('#overlay-title');
@@ -16,18 +17,21 @@ const width = canvas.width;
 const height = canvas.height;
 const radius = 5;
 const maxBalls = 12;
-const launchSpread = [0, -.31, .31];
+const launchSpread = [-.24, .24];
+const pierceDuration = 2.8;
+const bounceDuration = 4;
+const rimThreshold = .61;
 const upgradedSpread = [0, -.26, .26, .46];
 const columns = 16;
 const powerups = {
-  split: { glyph: '+', color: '#72f6c2', label: '分裂 · ボール追加！', frequency: 760 },
+  split: { glyph: '+', color: '#72f6c2', label: '分裂 · 爆裂弾を最大6球追加！', frequency: 760 },
   pierce: { glyph: '↑', color: '#ff8abd', label: '貫通 · ブロックを突き抜けろ！', frequency: 510 },
-  bounce: { glyph: '↗', color: '#ffe17d', label: '超反射 · 床と壁で跳ね返る！', frequency: 620 },
-  beam: { glyph: 'ϟ', color: '#88eaff', label: 'ビーム · 3列を一掃！', frequency: 210 },
+  bounce: { glyph: '↗', color: '#ffe17d', label: '超反射 · 床で2球まで復帰！', frequency: 620 },
+  beam: { glyph: 'ϟ', color: '#88eaff', label: 'ビーム · 5列の壁を焼く！', frequency: 210 },
 };
 const paddleY = 428;
 const step = 1 / 240;
-const bestKey = 'rim-breaker-best-v2';
+const bestKey = 'rim-breaker-best-v3';
 const soundKey = 'rim-breaker-sound-v1';
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const number = new Intl.NumberFormat('ja-JP');
@@ -78,7 +82,8 @@ let pierceTime;
 let bounceTime;
 let banner;
 let bannerTime;
-let serveGuard;
+let floorCharges;
+let returns;
 let lastPowerTone = -Infinity;
 
 function readSound() {
@@ -123,12 +128,12 @@ function shuffle(items) {
 }
 
 function paddleWidth() {
-  return 132 + loadout.wide * 14 - loadout.magnet * 12;
+  return Math.max(94, 114 - (stage - 1) * 2) + loadout.wide * 14 - loadout.magnet * 12;
 }
 
 function speed() {
   const depth = Math.min(12, stage - 1);
-  return 292 + depth * 8 + (stage % 5 === 0 ? 24 : 0) + loadout.blast * 22;
+  return 308 + depth * 10 + (stage % 5 === 0 ? 24 : 0) + loadout.blast * 22;
 }
 
 function position(x) {
@@ -141,22 +146,25 @@ function buildField() {
   const mirrored = Math.random() < .5;
   const reinforced = stage % 5 === 0;
   const rows = Math.min(7, 5 + Math.floor((stage - 1) / 3));
-  const rewards = stage === 1 ? ['split', 'bounce', 'pierce'] : ['split', 'bounce', 'pierce', 'beam'];
-  const opening = ['split', null, 'beam', 'bounce', null, 'split', 'pierce', 'beam', 'bounce', 'split', null, 'pierce', 'beam', null, 'bounce', 'split'];
+  const rewardLocations = [
+    { row: 1, lane: 4, power: 'beam' },
+    { row: 2, lane: 11, power: 'pierce' },
+    { row: 3, lane: 2, power: 'bounce' },
+    { row: rows - 2, lane: 13, power: 'split' },
+  ];
   bricks = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < columns; col++) {
       const lane = mirrored ? columns - 1 - col : col;
-      if (row < rows - 1) {
+      const power = rewardLocations.find((reward) => reward.row === row && reward.lane === lane)?.power ?? null;
+      if (!power && row < rows - 1) {
         if (formation === 1 && (row + lane) % 5 === 0) continue;
         if (formation === 2 && row + Math.min(lane, columns - 1 - lane) < 3) continue;
         if (formation === 3 && row > 0 && (lane === 4 || lane === 11)) continue;
       }
-      const power = row === rows - 1 && stage === 1 ? opening[col]
-        : (row * 7 + lane * 3 + stage) % 9 < 2 ? rewards[(row + lane + stage) % rewards.length] : null;
       const kind = power ? 'power'
-        : (row * 7 + lane * 5 + stage) % 11 === 0 ? 'core'
-          : reinforced && (row + lane) % 3 !== 0 ? 'armor' : 'plain';
+        : (row * 7 + lane * 5 + stage) % 17 === 0 ? 'core'
+          : (reinforced && (row + lane) % 3 !== 0 || row === rows - 1 && (lane === 6 || lane === 9)) ? 'armor' : 'plain';
       bricks.push({ row, col, kind, power, hp: kind === 'armor' ? 2 : 1, x: 9 + col * 29, y: 52 + row * 25, w: 27, h: 21 });
     }
   }
@@ -209,7 +217,8 @@ function ready(text) {
   pierceTime = 0;
   bounceTime = 0;
   bannerTime = 0;
-  serveGuard = 0;
+  floorCharges = 0;
+  returns = 0;
   pendingBalls = [];
   beams = [];
   hideOverlay();
@@ -224,7 +233,7 @@ function loadSector() {
   bursts = [];
   particles = [];
   buildField();
-  ready('盤面をタップして発射。マーク付きブロックを壊すと即パワーアップ。');
+  ready('盤面をタップして発射。パドルの光る端で返すと着弾が爆発。');
 }
 
 function start() {
@@ -253,7 +262,6 @@ function launch() {
   const heading = launchHeading();
   const offsets = loadout.quad ? upgradedSpread : launchSpread;
   balls = offsets.map((offset) => createBall(paddleX + offset * 13, paddleY - radius - 1, heading + offset));
-  serveGuard = stage === 1 ? 2 : 0;
   serves += 1;
   mode = 'play';
   say(remainingBricks === 1 ? 'ラスト1個を狙って発射！' : `${balls.length}球発射！ 光るマークを狙おう。`);
@@ -412,17 +420,18 @@ function activatePower(brick) {
   }
 
   if (power === 'split') {
-    for (const angle of [-.84, -.34, .34, .84]) {
+    for (const angle of [-.96, -.61, -.24, .24, .61, .96]) {
       if (balls.length + pendingBalls.length >= maxBalls) break;
-      pendingBalls.push(createBall(x + w / 2, y + h / 2, angle));
+      pendingBalls.push({ ...createBall(x + w / 2, y + h / 2, angle, 1.15), hot: true });
     }
   } else if (power === 'pierce') {
-    pierceTime = 5;
+    pierceTime = pierceDuration;
   } else if (power === 'bounce') {
-    bounceTime = 6;
+    bounceTime = bounceDuration;
+    floorCharges = 2;
   } else if (power === 'beam') {
-    beams.push({ x: x + w / 2, life: .34 });
-    return bricks.filter((target) => target.hp > 0 && Math.abs(target.col - col) <= 1);
+    beams.push({ x: x + w / 2, life: .46 });
+    return bricks.filter((target) => target.hp > 0 && Math.abs(target.col - col) <= 2);
   }
   return [];
 }
@@ -431,6 +440,7 @@ function strike(hit, hot, piercing) {
   const impacts = [{ brick: hit, damage: hot || piercing ? 2 : 1, blast: hot }];
   const detonations = new Set();
   for (const { brick, damage, blast } of impacts) {
+    if (brick.power && brick !== hit) continue;
     const destroyed = awardHit(brick, damage);
     if (destroyed && brick.power) {
       for (const target of activatePower(brick)) impacts.push({ brick: target, damage: 2 });
@@ -441,7 +451,7 @@ function strike(hit, hot, piercing) {
     for (const target of bricks) {
       const dx = Math.abs(target.col - brick.col);
       const dy = Math.abs(target.row - brick.row);
-      const inBlast = loadout.blast || stage === 1 ? Math.max(dx, dy) <= 1 : dx + dy <= 1;
+      const inBlast = blast || loadout.blast ? Math.max(dx, dy) <= 1 : dx + dy <= 1;
       if (inBlast && target.hp > 0) impacts.push({ brick: target, damage: 2 });
     }
   }
@@ -486,23 +496,26 @@ function moveBall(ball, dt) {
     if (Math.abs(crossingX - paddleX) <= half + radius * .65) {
       const offset = clamp((crossingX - paddleX) / half, -1, 1);
       const rebound = offset * (loadout.wide ? 1.02 : 1.16);
-      const aimAssist = remainingBricks <= 3 ? .60 : .16;
+      const aimAssist = remainingBricks <= 3 ? .40 : .10;
       const angle = Math.abs(offset) <= aimAssist
         ? aimAtNearestBrick(crossingX, paddleContact)
         : rebound;
-      const value = speed();
+      returns += 1;
+      const rallyBoost = 1 + Math.min(returns * .018, .19);
+      const powerBoost = pierceTime > 0 ? 1.28 : bounceTime > 0 ? 1.14 : 1;
+      const value = speed() * Math.max(rallyBoost, powerBoost);
       ball.x = crossingX;
       ball.y = paddleContact;
       ball.vx = Math.sin(angle) * value;
       ball.vy = -Math.cos(angle) * value;
-      ball.hot = Math.abs(offset) >= .65;
+      ball.hot = Math.abs(offset) >= rimThreshold;
       if (ball.hot && bannerTime <= 0) say('リムショット！ 次の着弾で爆発。');
       tone(ball.hot ? 515 : 250, .07);
     }
   }
 
   const hit = bricks.find((brick) => brick.hp > 0 && touches(ball, brick));
-  const piercing = pierceTime > 0;
+  const piercing = pierceTime > 0 || hit?.power === 'pierce';
   if (hit && !piercing) {
     const left = hit.x - radius;
     const right = hit.x + hit.w + radius;
@@ -523,19 +536,24 @@ function moveBall(ball, dt) {
   if (hit) {
     strike(hit, ball.hot, piercing);
     ball.hot = false;
+    if (hit.power === 'pierce') {
+      const multiplier = speed() * 1.28 / Math.hypot(ball.vx, ball.vy);
+      ball.vx *= multiplier;
+      ball.vy *= multiplier;
+    }
   }
 
   const netContact = height - 19;
-  if (ball.vy > 0 && ball.y >= netContact && (bounceTime > 0 || serveGuard > 0 || loadout.magnet && !spentNet)) {
-    if (bounceTime <= 0) {
-      if (serveGuard > 0) serveGuard -= 1;
-      else spentNet = true;
-    }
-    const angle = remainingBricks <= 8 ? aimAtNearestBrick(ball.x, netContact)
-      : (width / 2 - ball.x) / width * .85 + Math.sign(ball.vx || 1) * .30;
-    const multiplier = bounceTime > 0 ? 1.22 : 1;
-    Object.assign(ball, createBall(ball.x, netContact, angle, multiplier), { y: netContact, hot: bounceTime > 0 });
-    tone(bounceTime > 0 ? 510 : 300, .07, 'triangle');
+  const rebound = bounceTime > 0 && floorCharges > 0;
+  if (ball.vy > 0 && oldY <= netContact && ball.y >= netContact && (rebound || loadout.magnet && !spentNet)) {
+    if (rebound) floorCharges -= 1;
+    else spentNet = true;
+    const angle = remainingBricks <= 3 ? aimAtNearestBrick(ball.x, netContact)
+      : (width / 2 - ball.x) / width * .86 + Math.sign(ball.vx || 1) * .46;
+    const multiplier = rebound ? 1.25 : 1;
+    Object.assign(ball, createBall(ball.x, netContact, angle, multiplier), { y: netContact, hot: rebound });
+    if (rebound) bursts.push({ x: ball.x, y: netContact, life: .25 });
+    tone(rebound ? 510 : 300, .07, 'triangle');
   }
   return ball.y <= height + radius;
 }
@@ -614,8 +632,10 @@ function paint() {
   for (let i = 0; i < 40; i++) {
     ctx.fillRect((i * 139 + 37) % width, (i * i * 61 + i * 143 + 95) % height, i % 5 ? 1 : 2, i % 5 ? 1 : 2);
   }
-  ctx.fillStyle = bounceTime > 0 ? '#ffe17d' : serveGuard > 0 || loadout.magnet && !spentNet ? '#77f2dc88' : '#ff74764a';
-  ctx.fillRect(0, height - 19, width, bounceTime > 0 ? 3 : 1);
+  const activeFloor = bounceTime > 0 && floorCharges > 0;
+  const lastBall = mode === 'play' && balls.length === 1;
+  ctx.fillStyle = activeFloor ? '#ffe17d' : loadout.magnet && !spentNet ? '#77f2dc88' : lastBall ? '#ff7476ac' : '#ff74764a';
+  ctx.fillRect(0, height - 19, width, activeFloor ? 3 : 1);
 
   ctx.font = 'bold 13px system-ui, sans-serif';
   ctx.fillStyle = '#d5e8fa';
@@ -623,15 +643,18 @@ function paint() {
   ctx.textAlign = 'left';
   ctx.fillText(`残り  ${remainingBricks}`, 12, 25);
   ctx.textAlign = 'right';
-  if (mode === 'play' || mode === 'clearing') ctx.fillText(`●  ${balls.length}`, width - 12, 25);
+  if (mode === 'play' || mode === 'clearing') {
+    if (lastBall) ctx.fillStyle = '#ff9c96';
+    ctx.fillText(`●  ${balls.length}`, width - 12, 25);
+  }
 
   let timerX = 92;
-  for (const [power, time, duration] of [['pierce', pierceTime, 5], ['bounce', bounceTime, 6]]) {
+  for (const [power, time, duration] of [['pierce', pierceTime, pierceDuration], ['bounce', bounceTime, bounceDuration]]) {
     if (time <= 0) continue;
     const effect = powerups[power];
     ctx.fillStyle = effect.color;
     ctx.textAlign = 'left';
-    ctx.fillText(`${effect.glyph}  ${power === 'pierce' ? '貫通' : '超反射'}`, timerX, 23);
+    ctx.fillText(`${effect.glyph}  ${power === 'pierce' ? '貫通' : `超反射 ×${floorCharges}`}`, timerX, 23);
     ctx.fillRect(timerX, 34, time / duration * 76, 2);
     timerX += 94;
   }
@@ -674,7 +697,7 @@ function paint() {
 
   const half = paddleWidth() / 2;
   const startX = paddleX - half;
-  const edge = (half - half * .65);
+  const edge = half * (1 - rimThreshold);
   ctx.fillStyle = '#233b57';
   ctx.fillRect(startX, paddleY, half * 2, 10);
   ctx.fillStyle = '#ffbe71';
@@ -704,12 +727,12 @@ function paint() {
   }
   ctx.globalAlpha = 1;
   for (const beam of beams) {
-    ctx.globalAlpha = beam.life / .34;
+    ctx.globalAlpha = beam.life / .46;
     ctx.fillStyle = '#36caff55';
-    ctx.fillRect(beam.x - 43, 0, 86, paddleY);
-    for (const offset of [-29, 0, 29]) {
+    ctx.fillRect(beam.x - 72, 0, 144, paddleY);
+    for (const offset of [-58, -29, 0, 29, 58]) {
       ctx.fillStyle = '#68d7ff';
-      ctx.fillRect(beam.x + offset - 4, 0, 8, paddleY);
+      ctx.fillRect(beam.x + offset - 7, 0, 14, paddleY);
       ctx.fillStyle = '#effdff';
       ctx.fillRect(beam.x + offset - 1, 0, 2, paddleY);
     }
@@ -756,6 +779,10 @@ function pointPaddle(event) {
   if (mode !== 'ready' && mode !== 'play') return;
   const box = canvas.getBoundingClientRect();
   position((event.clientX - box.left) / box.width * width);
+}
+
+for (const type of ['contextmenu', 'selectstart']) {
+  cabinet.addEventListener(type, (event) => event.preventDefault());
 }
 
 canvas.addEventListener('pointerdown', (event) => {

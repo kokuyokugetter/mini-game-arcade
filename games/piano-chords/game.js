@@ -1,5 +1,5 @@
 const totalQuestions = 10;
-const noteNames = ['ド', 'レ♭', 'レ', 'ミ♭', 'ミ', 'ファ', 'ソ♭', 'ソ', 'ラ♭', 'ラ', 'シ♭', 'シ'];
+const noteNames = ['ド', 'ド♯', 'レ', 'ミ♭', 'ミ', 'ファ', 'ファ♯', 'ソ', 'ラ♭', 'ラ', 'シ♭', 'シ'];
 const octaveSize = noteNames.length;
 const middleC = 60;
 const octaveBases = [48, middleC, 72]; // C3, C4, C5
@@ -88,6 +88,10 @@ function playChord(notes) {
     }
   }
 
+  trackPlayback(output, voices);
+}
+
+function trackPlayback(output, voices) {
   const current = { output, voices };
   playback = current;
   let remaining = voices.length;
@@ -127,7 +131,7 @@ function buildChoices() {
       const key = document.createElement('button');
       key.type = 'button';
       key.textContent = noteName(note);
-      key.classList.toggle('black-key', key.textContent.includes('♭'));
+      key.classList.toggle('black-key', /[♯♭]/.test(key.textContent));
       key.setAttribute('aria-pressed', 'false');
       key.addEventListener('click', () => {
         if (selection.has(note)) {
@@ -176,25 +180,29 @@ function showQuestion() {
   next.hidden = true;
 }
 
-async function playNotes(notes) {
-  const requested = target;
+async function playAudio(isCurrent, message, render) {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) {
-      feedback.textContent = 'このブラウザは音声再生に対応していません。';
+      message.textContent = 'このブラウザは音声再生に対応していません。';
       return false;
     }
     audio ??= new AudioContext();
     if (audio.state !== 'running') await audio.resume();
-    if (game.hidden || requested !== target) return false;
-    playChord(notes);
+    if (!isCurrent()) return false;
+    render();
     return true;
   } catch {
-    if (!game.hidden && requested === target) {
-      feedback.textContent = '音を再生できませんでした。もう一度お試しください。';
+    if (isCurrent()) {
+      message.textContent = '音を再生できませんでした。もう一度お試しください。';
     }
     return false;
   }
+}
+
+function playNotes(notes) {
+  const requested = target;
+  return playAudio(() => !game.hidden && requested === target, feedback, () => playChord(notes));
 }
 
 play.addEventListener('click', async () => {
@@ -281,3 +289,135 @@ document.querySelector('#challenge').addEventListener('click', () => startFromSe
 document.querySelector('#restart').addEventListener('click', () => startGame(true));
 document.querySelector('#back-to-setup').addEventListener('click', showSetup);
 document.querySelector('#result-to-setup').addEventListener('click', showSetup);
+
+const minFrequency = 40;
+const maxFrequency = 2000;
+const referenceFrequency = 440;
+const frequencyGame = document.querySelector('#frequency-game');
+const frequencyStart = document.querySelector('#frequency-start');
+const frequencyTitle = document.querySelector('#frequency-title');
+const frequencyScore = document.querySelector('#frequency-score');
+const frequencyPlay = document.querySelector('#frequency-play');
+const frequencyReference = document.querySelector('#frequency-reference');
+const frequencyAnswer = document.querySelector('#frequency-answer');
+const frequencyGuess = document.querySelector('#frequency-guess');
+const frequencySubmit = document.querySelector('#frequency-submit');
+const frequencyFeedback = document.querySelector('#frequency-feedback');
+const frequencyNext = document.querySelector('#frequency-next');
+const frequencyRetry = document.querySelector('#frequency-retry');
+const percentFormat = new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 2 });
+
+let frequencyRound;
+let frequencyPoints;
+let frequencyQuestion;
+
+function playPureTone(hertz) {
+  stopPlayback();
+  const start = audio.currentTime + .02;
+  const output = audio.createGain();
+  output.connect(audio.destination);
+  const oscillator = audio.createOscillator();
+  const envelope = audio.createGain();
+  oscillator.type = 'sine';
+  oscillator.frequency.value = hertz;
+  envelope.gain.setValueAtTime(0, start);
+  envelope.gain.linearRampToValueAtTime(.19, start + .05);
+  envelope.gain.setValueAtTime(.19, start + .84);
+  envelope.gain.linearRampToValueAtTime(0, start + 1);
+  oscillator.connect(envelope).connect(output);
+  oscillator.start(start);
+  oscillator.stop(start + 1);
+  trackPlayback(output, [oscillator]);
+}
+
+function showFrequencyQuestion() {
+  stopPlayback();
+  // Even spacing on the pitch axis gives low and high octaves comparable odds.
+  const hertz = Math.round(minFrequency * (maxFrequency / minFrequency) ** Math.random());
+  frequencyQuestion = { hertz, heard: false, answered: false };
+  frequencyTitle.textContent = `ヘルツ当て 第${frequencyRound}問 / 全${totalQuestions}問`;
+  frequencyScore.textContent = `${frequencyPoints}点`;
+  frequencyFeedback.textContent = '';
+  frequencyPlay.textContent = '出題音を聴く';
+  frequencyGuess.value = '';
+  frequencyGuess.disabled = frequencySubmit.disabled = true;
+  frequencyNext.hidden = true;
+  frequencyTitle.focus();
+}
+
+function startFrequency() {
+  frequencyRound = 1;
+  frequencyPoints = 0;
+  setup.hidden = true;
+  frequencyGame.hidden = false;
+  frequencyAnswer.hidden = frequencyPlay.hidden = false;
+  frequencyRetry.hidden = true;
+  showFrequencyQuestion();
+}
+
+function listenToFrequency(hertz, current) {
+  return playAudio(
+    () => !frequencyGame.hidden && current === frequencyQuestion,
+    frequencyFeedback,
+    () => playPureTone(hertz)
+  );
+}
+
+frequencyPlay.addEventListener('click', async () => {
+  const current = frequencyQuestion;
+  if (!await listenToFrequency(current.hertz, current)) return;
+  frequencyPlay.textContent = 'もう一度聴く';
+  if (current.answered || current.heard) return;
+  current.heard = true;
+  frequencyGuess.disabled = frequencySubmit.disabled = false;
+  frequencyFeedback.textContent = '';
+  frequencyGuess.focus();
+});
+
+frequencyReference.addEventListener('click', () => listenToFrequency(referenceFrequency, frequencyQuestion));
+
+frequencyAnswer.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const current = frequencyQuestion;
+  const guess = frequencyGuess.valueAsNumber;
+  if (frequencyGame.hidden || !current?.heard || current.answered || !frequencyGuess.validity.valid || !Number.isFinite(guess)) return;
+  current.answered = true;
+  stopPlayback();
+  frequencyGuess.disabled = frequencySubmit.disabled = true;
+  const error = Math.abs(guess - current.hertz) / current.hertz * 100;
+  const points = Math.max(0, Math.round(100 - error));
+  frequencyPoints += points;
+  frequencyScore.textContent = `${frequencyPoints}点`;
+  const judgment = error <= 5 + 1e-9 ? '正解！' : '不正解。';
+  frequencyFeedback.textContent = `${judgment} 正解 ${current.hertz.toLocaleString('ja-JP')} Hz · 誤差 ${percentFormat.format(error)}% · ${points}点`;
+  frequencyNext.textContent = frequencyRound === totalQuestions ? '結果を見る' : '次の問題へ';
+  frequencyNext.hidden = false;
+  frequencyNext.focus();
+});
+
+frequencyNext.addEventListener('click', () => {
+  if (frequencyRound < totalQuestions) {
+    frequencyRound += 1;
+    showFrequencyQuestion();
+    return;
+  }
+
+  stopPlayback();
+  frequencyQuestion = undefined;
+  frequencyTitle.textContent = 'ヘルツ当て 結果';
+  frequencyScore.textContent = `${(100 * totalQuestions).toLocaleString('ja-JP')}点満点中 ${frequencyPoints}点`;
+  frequencyFeedback.textContent = '';
+  frequencyAnswer.hidden = frequencyNext.hidden = frequencyPlay.hidden = true;
+  frequencyRetry.hidden = false;
+  frequencyTitle.focus();
+});
+
+frequencyStart.addEventListener('click', startFrequency);
+frequencyRetry.addEventListener('click', startFrequency);
+document.querySelector('#frequency-exit').addEventListener('click', () => {
+  stopPlayback();
+  frequencyQuestion = undefined;
+  frequencyGame.hidden = true;
+  setup.hidden = false;
+  frequencyStart.focus();
+});

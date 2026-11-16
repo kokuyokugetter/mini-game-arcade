@@ -56,3 +56,16 @@ p {
 a {
   color: #ffca6e;
 }
+
+.game-surface,
+.game-surface * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.game-surface :is(input, textarea, [contenteditable="true"]) {
+  -webkit-touch-callout: initial;
+  -webkit-user-select: text;
+  user-select: text;
+}

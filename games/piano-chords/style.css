@@ -37,7 +37,8 @@
 }
 
 .chords button,
-.chords select {
+.chords select,
+.chords input {
   min-height: 2.75rem;
   padding: .65rem .85rem;
   border: 1px solid #8b82a8;
@@ -48,18 +49,28 @@
   cursor: pointer;
 }
 
+.chords input {
+  width: 8em;
+  min-width: 0;
+  box-sizing: border-box;
+  cursor: text;
+  font-variant-numeric: tabular-nums;
+}
+
 .chords button:hover:not(:disabled) {
   border-color: #ffca6e;
 }
 
 .chords button:focus-visible,
 .chords select:focus-visible,
+.chords input:focus-visible,
 .back:focus-visible {
   outline: 2px solid #ffca6e;
   outline-offset: 3px;
 }
 
-.chords button:disabled {
+.chords button:disabled,
+.chords input:disabled {
   opacity: .72;
   cursor: default;
 }
@@ -97,8 +108,17 @@
   margin-top: 1.5rem;
 }
 
-#challenge {
+#challenge,
+#frequency-start {
   margin-top: .75rem;
+}
+
+#frequency-answer {
+  margin-top: 1rem;
+}
+
+#frequency-rule {
+  font-size: .9rem;
 }
 
 .practice-controls,

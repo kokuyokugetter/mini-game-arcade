@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>スッキリ洗浄室 | ミニゲームアーケード</title>
-  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="../../assets/site.css?v=2">
   <link rel="stylesheet" href="./style.css">
   <script type="module" src="./game.js"></script>
 </head>
@@ -18,7 +18,7 @@
       <h1>スッキリ<span>洗浄室</span></h1>
       <p>泡を飛ばして、ピカピカになるまで。</p>
     </header>
-    <section class="station" aria-labelledby="job">
+    <section class="station game-surface" aria-labelledby="job">
       <div class="station-head">
         <div>
           <p id="job-number" class="job-number">依頼 01</p>
@@ -50,7 +50,7 @@
         <button id="burst" type="button" aria-pressed="false" disabled><span>強力噴射</span> <kbd>B</kbd></button>
       </div>
     </section>
-    <p id="status" class="status" role="status">汚れをなぞって洗い流そう。水圧が満タンになったら強力噴射。</p>
+    <p id="status" class="status game-surface" role="status">汚れをなぞって洗い流そう。水圧が満タンになったら強力噴射。</p>
     <p class="help">ドラッグで洗浄。キーボードは盤面にフォーカスして、矢印で狙い、Spaceで噴射。</p>
   </main>
 </body>
