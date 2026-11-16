@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>境界の魔王 | ミニゲームアーケード</title>
   <link rel="stylesheet" href="../../assets/site.css">
-  <link rel="stylesheet" href="./style.css">
-  <script src="./game.js" defer></script>
+  <link rel="stylesheet" href="./style.css?v=2">
+  <script src="./game.js?v=2" defer></script>
 </head>
 <body>
   <main>
     <a href="../../">← ゲーム一覧</a>
     <header>
       <h1>境界の魔王</h1>
-      <p>橋が落ち、村から人が消えた。残された地図を手に、魔王城へ向かう。</p>
+      <p>村から人が消えた。橋を渡って魔王に挑むか、地図に残った異変を追うか。</p>
     </header>
     <section class="screen" aria-label="ゲーム画面">
       <canvas id="scene" width="272" height="144" aria-label="草原と川を隔てて城がある地図"></canvas>
@@ -35,21 +35,38 @@
         <button id="inspect" type="button">足元を調べる</button>
       </div>
     </section>
-    <section id="battle" class="commands" aria-label="戦闘コマンド" hidden>
-      <button id="attack" type="button">攻撃</button>
-      <button id="guard" type="button">防御</button>
-      <button id="shield" type="button">盾を外す</button>
-      <button id="heal" type="button">薬草</button>
-      <button id="reflect" type="button" hidden>呪文を反射</button>
-      <button id="restore" type="button" hidden>村人の記録を返す</button>
+    <section id="battle" aria-label="戦闘コマンド" hidden>
+      <p id="tell" class="tell" role="status"></p>
+      <div class="commands">
+        <button id="attack" type="button">攻撃</button>
+        <button id="guard" type="button">防御</button>
+        <button id="heal" type="button">薬草</button>
+        <button id="shield" type="button">盾を外す</button>
+        <button id="leave" type="button">門前へ戻る</button>
+      </div>
+      <div class="commands discoveries">
+        <button data-route="sword" type="button" hidden></button>
+        <button data-route="wrap" type="button" hidden></button>
+        <button data-route="shield" type="button" hidden></button>
+        <button data-route="ledger" type="button" hidden></button>
+        <form id="passphrase" hidden>
+          <label for="password">玉座の合言葉</label>
+          <input id="password" type="text" maxlength="24" autocomplete="off" spellcheck="false">
+          <button type="submit">入力する</button>
+        </form>
+      </div>
     </section>
     <section id="ending" class="commands" aria-label="再開" hidden>
-      <button id="retry" type="button">魔王戦をやり直す</button>
+      <button id="retry" type="button">もう一度、魔王に挑む</button>
       <button id="restart" type="button">村からやり直す</button>
     </section>
-    <details id="hints">
+    <details>
+      <summary id="journal-summary">バグ図鑑</summary>
+      <ul id="journal"></ul>
+    </details>
+    <details>
       <summary>ヒント</summary>
-      <ol id="hint-list"></ol>
+      <div id="hint-list"></div>
     </details>
   </main>
 </body>

@@ -21,14 +21,6 @@ canvas {
   image-rendering: pixelated;
 }
 
-.screen.shift-one canvas {
-  transform: translateX(.5%);
-}
-
-.screen.shift-two canvas {
-  transform: translateX(1.5%);
-}
-
 .status {
   display: flex;
   flex-wrap: wrap;
@@ -41,6 +33,10 @@ canvas {
 
 .status h2 {
   font-size: 1rem;
+}
+
+.status h2:focus {
+  outline: none;
 }
 
 #stats {
@@ -83,7 +79,7 @@ canvas {
   margin-top: .75rem;
 }
 
-.commands[hidden] {
+[hidden] {
   display: none;
 }
 
@@ -115,11 +111,37 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
-#reflect,
-#restore {
+[data-route] {
   color: #21172b;
   border-color: #d8adff;
   background: #d8adff;
+}
+
+.tell {
+  padding: .45rem .75rem;
+  border: 1px solid #77578f;
+  color: #fff1d7;
+}
+
+#passphrase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}
+
+#passphrase[hidden] {
+  display: none;
+}
+
+#password {
+  max-width: 100%;
+  width: 8rem;
+  padding: .4rem;
+  border: 1px solid #8b82a8;
+  background: #272338;
+  color: inherit;
+  font: inherit;
 }
 
 details {
@@ -127,7 +149,7 @@ details {
   color: #ccc7dc;
 }
 
-details ol {
+details ul {
   margin-block: .5rem;
   padding-inline-start: 1.6rem;
 }
