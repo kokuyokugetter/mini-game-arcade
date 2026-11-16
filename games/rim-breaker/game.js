@@ -14,10 +14,21 @@ const hud = Object.fromEntries(['sector', 'lives', 'score', 'best'].map((key) =>
 
 const width = canvas.width;
 const height = canvas.height;
-const radius = 6;
+const radius = 5;
+const maxBalls = 12;
+const launchSpread = [0, -.31, .31];
+const upgradedSpread = [0, -.26, .26, .46];
+const columns = 16;
+const powerups = {
+  split: { glyph: '+', color: '#72f6c2', label: '分裂 · ボール追加！', frequency: 760 },
+  pierce: { glyph: '↑', color: '#ff8abd', label: '貫通 · ブロックを突き抜けろ！', frequency: 510 },
+  bounce: { glyph: '↗', color: '#ffe17d', label: '超反射 · 床と壁で跳ね返る！', frequency: 620 },
+  beam: { glyph: 'ϟ', color: '#88eaff', label: 'ビーム · 3列を一掃！', frequency: 210 },
+};
 const paddleY = 428;
 const step = 1 / 240;
-const bestKey = 'rim-breaker-best-v1';
+const bestKey = 'rim-breaker-best-v2';
+const soundKey = 'rim-breaker-sound-v1';
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const number = new Intl.NumberFormat('ja-JP');
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -31,7 +42,7 @@ const palettes = [
 const upgrades = [
   { id: 'wide', name: 'ワイドパドル', description: 'パドル幅＋14。反射の角度が少し穏やかになる。', limit: 2 },
   { id: 'blast', name: '連鎖炉', description: '爆風が斜めにも届く。そのぶん発射・反射の球速が上がる。', limit: 1 },
-  { id: 'twin', name: '双発コア', description: '次に装填するたび2球で発射。飛んでいる球が尽きるまで続行。', limit: 1 },
+  { id: 'quad', name: '四連発', description: '発射するたび4球に増える。', limit: 1 },
   { id: 'magnet', name: 'セーフティネット', description: '各セクターで一度だけ落球を防ぐ。装備中はパドルが少し短くなる。', limit: 1 },
 ];
 
@@ -54,10 +65,34 @@ let remainingBricks;
 let hitFreeze;
 let clearTime;
 let audio;
-let sound = false;
+let audioBus;
+let nextTone = 0;
+let sound = readSound();
+
 let previousTime = 0;
 let accumulator = 0;
-let dragId = null;
+let drag = null;
+let pendingBalls;
+let beams;
+let pierceTime;
+let bounceTime;
+let banner;
+let bannerTime;
+let serveGuard;
+let lastPowerTone = -Infinity;
+
+function readSound() {
+  try {
+    return localStorage.getItem(soundKey) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+function updateSoundButton() {
+  soundButton.setAttribute('aria-pressed', String(sound));
+  soundButton.textContent = sound ? '効果音 ON' : '効果音 OFF';
+}
 
 function readBest() {
   try {
@@ -88,12 +123,12 @@ function shuffle(items) {
 }
 
 function paddleWidth() {
-  return 104 + loadout.wide * 14 - loadout.magnet * 12;
+  return 132 + loadout.wide * 14 - loadout.magnet * 12;
 }
 
 function speed() {
   const depth = Math.min(12, stage - 1);
-  return 295 + depth * 9 + (stage % 5 === 0 ? 27 : 0) + loadout.blast * 44;
+  return 292 + depth * 8 + (stage % 5 === 0 ? 24 : 0) + loadout.blast * 22;
 }
 
 function position(x) {
@@ -105,23 +140,24 @@ function buildField() {
   const formation = stage === 1 ? 0 : Math.floor(Math.random() * 4);
   const mirrored = Math.random() < .5;
   const reinforced = stage % 5 === 0;
-  const rows = stage === 1 ? 3 : reinforced ? 5 : Math.min(4, 3 + Math.floor(stage / 3));
-  const explosive = stage === 1 ? 3 : Math.floor(Math.random() * 4) + 1;
+  const rows = Math.min(7, 5 + Math.floor((stage - 1) / 3));
+  const rewards = stage === 1 ? ['split', 'bounce', 'pierce'] : ['split', 'bounce', 'pierce', 'beam'];
+  const opening = ['split', null, 'beam', 'bounce', null, 'split', 'pierce', 'beam', 'bounce', 'split', null, 'pierce', 'beam', null, 'bounce', 'split'];
   bricks = [];
   for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < 8; col++) {
-      const lane = mirrored ? 7 - col : col;
-      if (stage === 1 && (col === 0 || col === 7 || (row === 0 && (col === 1 || col === 6)))) continue;
-      if (formation === 1 && (row + lane) % 4 === 0) continue;
-      if (formation === 2 && row + Math.min(lane, 7 - lane) < 2) continue;
-      if (formation === 3 && row > 0 && (lane === 2 || lane === 5)) continue;
-      const kind = (row === rows - 1 && (col === explosive || col === 7 - explosive))
-        || (row === 0 && formation === 2 && col === 4)
-        ? 'core'
-        : (reinforced && (row + lane) % 3 !== 0) || (stage >= 3 && row === 1 && lane % 3 === 0)
-          ? 'armor'
-          : 'plain';
-      bricks.push({ row, col, kind, hp: kind === 'armor' ? 2 : 1, x: 26 + col * 54, y: 58 + row * 30, w: 50, h: 24 });
+    for (let col = 0; col < columns; col++) {
+      const lane = mirrored ? columns - 1 - col : col;
+      if (row < rows - 1) {
+        if (formation === 1 && (row + lane) % 5 === 0) continue;
+        if (formation === 2 && row + Math.min(lane, columns - 1 - lane) < 3) continue;
+        if (formation === 3 && row > 0 && (lane === 4 || lane === 11)) continue;
+      }
+      const power = row === rows - 1 && stage === 1 ? opening[col]
+        : (row * 7 + lane * 3 + stage) % 9 < 2 ? rewards[(row + lane + stage) % rewards.length] : null;
+      const kind = power ? 'power'
+        : (row * 7 + lane * 5 + stage) % 11 === 0 ? 'core'
+          : reinforced && (row + lane) % 3 !== 0 ? 'armor' : 'plain';
+      bricks.push({ row, col, kind, power, hp: kind === 'armor' ? 2 : 1, x: 9 + col * 29, y: 52 + row * 25, w: 27, h: 21 });
     }
   }
   remainingBricks = bricks.length;
@@ -138,6 +174,7 @@ function updateHud() {
   hud.best.textContent = number.format(best);
   action.disabled = mode !== 'ready';
   pause.disabled = mode !== 'ready' && mode !== 'play' && mode !== 'pause';
+  canvas.classList.toggle('is-ready', mode === 'ready');
   pause.textContent = mode === 'pause' ? '再開' : '一時停止';
 }
 
@@ -169,6 +206,12 @@ function ready(text) {
   combo = 0;
   balls = [];
   hitFreeze = 0;
+  pierceTime = 0;
+  bounceTime = 0;
+  bannerTime = 0;
+  serveGuard = 0;
+  pendingBalls = [];
+  beams = [];
   hideOverlay();
   say(text);
   updateHud();
@@ -181,42 +224,52 @@ function loadSector() {
   bursts = [];
   particles = [];
   buildField();
-  ready(stage % 5 === 0 ? '装甲セクター。爆風を当てると装甲ごと壊せる。' : '狙いを決めて発射。光る端で返すと爆発。');
+  ready('盤面をタップして発射。マーク付きブロックを壊すと即パワーアップ。');
 }
 
 function start() {
   stage = 1;
   lives = 3;
   score = 0;
-  loadout = { wide: 0, blast: 0, twin: 0, magnet: 0 };
+  loadout = { wide: 0, blast: 0, quad: 0, magnet: 0 };
   loadSector();
 }
 
 function launchHeading() {
-  if (remainingBricks === 1) return aimAtLastBrick(paddleX, paddleY - radius - 1);
+  if (remainingBricks <= 3) return aimAtNearestBrick(paddleX, paddleY - radius - 1);
   return (width / 2 - paddleX) / 1800 + (serves % 2 === 0 ? .14 : -.14);
 }
 
-function aimAtLastBrick(x, y) {
-  const brick = bricks.find(({ hp }) => hp > 0);
+function aimAtNearestBrick(x, y) {
+  const brick = bricks.reduce((nearest, target) => {
+    if (!target.hp) return nearest;
+    return !nearest || Math.abs(target.x + target.w / 2 - x) < Math.abs(nearest.x + nearest.w / 2 - x) ? target : nearest;
+  }, null);
   return Math.atan2(brick.x + brick.w / 2 - x, y - brick.y - brick.h / 2);
 }
 
 function launch() {
   if (mode !== 'ready') return;
-  const value = speed();
   const heading = launchHeading();
-  const angles = loadout.twin ? [heading, heading + (heading < 0 ? -.30 : .30)] : [heading];
-  balls = angles.map((angle, i) => ({
-    x: paddleX + (i === 1 ? 8 : 0),
-    y: paddleY - radius - 1,
-    vx: Math.sin(angle) * value, vy: -Math.cos(angle) * value, hot: false,
-  }));
+  const offsets = loadout.quad ? upgradedSpread : launchSpread;
+  balls = offsets.map((offset) => createBall(paddleX + offset * 13, paddleY - radius - 1, heading + offset));
+  serveGuard = stage === 1 ? 2 : 0;
   serves += 1;
   mode = 'play';
-  say(remainingBricks === 1 ? 'ラスト1個。中央で返すと残ったブロックを狙う。' : '中央は浅く、光る両端は鋭く反射。');
+  say(remainingBricks === 1 ? 'ラスト1個を狙って発射！' : `${balls.length}球発射！ 光るマークを狙おう。`);
   updateHud();
   tone(335, .08);
+}
+
+function createBall(x, y, angle, multiplier = 1) {
+  const value = speed() * multiplier;
+  return {
+    x: clamp(x, radius, width - radius),
+    y: clamp(y, radius, paddleY - radius - 1),
+    vx: Math.sin(angle) * value,
+    vy: -Math.cos(angle) * value,
+    hot: false,
+  };
 }
 
 function playerAction() {
@@ -292,29 +345,37 @@ function miss() {
   tone(110, .2, 'triangle');
 }
 
-function tone(frequency, duration, type = 'sine') {
+function tone(frequency, duration, type = 'sine', priority = false) {
   if (!sound) return;
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
-    audio ??= new AudioContext();
+    if (!audio) {
+      audio = new AudioContext();
+      audioBus = audio.createDynamicsCompressor();
+      audioBus.threshold.value = -18;
+      audioBus.ratio.value = 4;
+      audioBus.connect(audio.destination);
+    }
     if (audio.state !== 'running') {
       audio.resume().catch(() => {});
-      return;
     }
+    const time = audio.currentTime;
+    if (!priority && time < nextTone) return;
+    nextTone = time + .021;
     const oscillator = audio.createOscillator();
     const volume = audio.createGain();
-    const time = audio.currentTime;
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, time);
     oscillator.frequency.exponentialRampToValueAtTime(Math.max(45, frequency * .7), time + duration);
     volume.gain.setValueAtTime(.045, time);
     volume.gain.exponentialRampToValueAtTime(.0001, time + duration);
-    oscillator.connect(volume).connect(audio.destination);
+    oscillator.connect(volume).connect(audioBus);
+    oscillator.onended = () => { oscillator.disconnect(); volume.disconnect(); };
     oscillator.start(time);
     oscillator.stop(time + duration);
   } catch {
     sound = false;
-    soundButton.setAttribute('aria-pressed', 'false');
+    updateSoundButton();
   }
 }
 
@@ -331,41 +392,66 @@ function awardHit(brick, power) {
   const x = brick.x + brick.w / 2;
   const y = brick.y + brick.h / 2;
   if (!reducedMotion.matches) {
-    for (let i = 0; i < 6 && particles.length < 110; i++) {
+    for (let i = 0; i < 8 && particles.length < 260; i++) {
       const angle = Math.random() * Math.PI * 2;
-      particles.push({ x, y, vx: Math.cos(angle) * 120, vy: Math.sin(angle) * 95, life: .32, color: brick.kind === 'core' ? '#ff976e' : '#9ce9fa' });
+      particles.push({ x, y, vx: Math.cos(angle) * (65 + Math.random() * 165), vy: Math.sin(angle) * (50 + Math.random() * 140), life: .36, color: powerups[brick.power]?.color ?? (brick.kind === 'core' ? '#ff976e' : palettes[brick.row % palettes.length][0]) });
     }
   }
   return true;
 }
 
-function strike(hit, hot) {
-  const detonations = [];
-  const scheduled = new Set();
-  function detonate(brick) {
-    if (scheduled.has(brick)) return;
-    scheduled.add(brick);
-    detonations.push(brick);
+function activatePower(brick) {
+  const { power, x, y, w, h, col } = brick;
+  const effect = powerups[power];
+  banner = effect;
+  bannerTime = 1.65;
+  say(effect.label);
+  if (performance.now() - lastPowerTone > 85) {
+    lastPowerTone = performance.now();
+    tone(effect.frequency, power === 'beam' ? .18 : .12, power === 'beam' ? 'sawtooth' : 'triangle', true);
   }
-  const destroyed = awardHit(hit, hot ? 2 : 1);
-  if (hot || (destroyed && hit.kind === 'core')) detonate(hit);
-  for (const source of detonations) {
-    bursts.push({ x: source.x + source.w / 2, y: source.y + source.h / 2, life: .25 });
-    for (const brick of bricks) {
-      const dx = Math.abs(brick.col - source.col);
-      const dy = Math.abs(brick.row - source.row);
-      const inBlast = loadout.blast ? Math.max(dx, dy) <= 1 : dx + dy <= 1;
-      if (inBlast && awardHit(brick, 2) && brick.kind === 'core') detonate(brick);
+
+  if (power === 'split') {
+    for (const angle of [-.84, -.34, .34, .84]) {
+      if (balls.length + pendingBalls.length >= maxBalls) break;
+      pendingBalls.push(createBall(x + w / 2, y + h / 2, angle));
+    }
+  } else if (power === 'pierce') {
+    pierceTime = 5;
+  } else if (power === 'bounce') {
+    bounceTime = 6;
+  } else if (power === 'beam') {
+    beams.push({ x: x + w / 2, life: .34 });
+    return bricks.filter((target) => target.hp > 0 && Math.abs(target.col - col) <= 1);
+  }
+  return [];
+}
+
+function strike(hit, hot, piercing) {
+  const impacts = [{ brick: hit, damage: hot || piercing ? 2 : 1, blast: hot }];
+  const detonations = new Set();
+  for (const { brick, damage, blast } of impacts) {
+    const destroyed = awardHit(brick, damage);
+    if (destroyed && brick.power) {
+      for (const target of activatePower(brick)) impacts.push({ brick: target, damage: 2 });
+    }
+    if ((!blast && !(destroyed && brick.kind === 'core')) || detonations.has(brick)) continue;
+    detonations.add(brick);
+    bursts.push({ x: brick.x + brick.w / 2, y: brick.y + brick.h / 2, life: .25 });
+    for (const target of bricks) {
+      const dx = Math.abs(target.col - brick.col);
+      const dy = Math.abs(target.row - brick.row);
+      const inBlast = loadout.blast || stage === 1 ? Math.max(dx, dy) <= 1 : dx + dy <= 1;
+      if (inBlast && target.hp > 0) impacts.push({ brick: target, damage: 2 });
     }
   }
-  if (detonations.length > 0) {
-    if (!reducedMotion.matches) hitFreeze = .026;
-    say(combo >= 2 ? `${combo}連鎖！` : '爆発！');
-    tone(135, .13, 'triangle');
-  } else if (hit.hp === 0) {
-    tone(430 + Math.min(combo, 9) * 40, .055);
+  if (detonations.size) {
+    if (!reducedMotion.matches) hitFreeze = .014;
+    tone(135, .11, 'triangle');
+  } else if (hit.hp === 0 && bannerTime <= 0) {
+    tone(430 + Math.min(combo, 14) * 34, .045);
+    if (remainingBricks <= 3) say(`残り${remainingBricks}個。中央で返すと自動で狙う。`);
   }
-  if (remainingBricks === 1) say('ラスト1個。パドルの中央で返すと残ったブロックを狙う。');
   saveBest();
   updateHud();
 }
@@ -384,10 +470,12 @@ function moveBall(ball, dt) {
   if (ball.x < radius || ball.x > width - radius) {
     ball.x = clamp(ball.x, radius, width - radius);
     ball.vx = ball.x === radius ? Math.abs(ball.vx) : -Math.abs(ball.vx);
+    if (bounceTime > 0) ball.hot = true;
   }
   if (ball.y < radius) {
     ball.y = radius;
     ball.vy = Math.abs(ball.vy);
+    if (bounceTime > 0) ball.hot = true;
   }
 
   const paddleContact = paddleY - radius;
@@ -398,24 +486,24 @@ function moveBall(ball, dt) {
     if (Math.abs(crossingX - paddleX) <= half + radius * .65) {
       const offset = clamp((crossingX - paddleX) / half, -1, 1);
       const rebound = offset * (loadout.wide ? 1.02 : 1.16);
-      const drift = Math.sign(offset || width / 2 - crossingX || 1) * .055;
-      const angle = remainingBricks === 1 && Math.abs(offset) <= .24
-        ? aimAtLastBrick(crossingX, paddleContact)
-        : Math.abs(rebound) < .055 ? drift : rebound;
+      const aimAssist = remainingBricks <= 3 ? .60 : .16;
+      const angle = Math.abs(offset) <= aimAssist
+        ? aimAtNearestBrick(crossingX, paddleContact)
+        : rebound;
       const value = speed();
       ball.x = crossingX;
       ball.y = paddleContact;
       ball.vx = Math.sin(angle) * value;
       ball.vy = -Math.cos(angle) * value;
       ball.hot = Math.abs(offset) >= .65;
-      combo = 0;
-      if (ball.hot) say('リムショット！ 次の着弾で爆発。');
+      if (ball.hot && bannerTime <= 0) say('リムショット！ 次の着弾で爆発。');
       tone(ball.hot ? 515 : 250, .07);
     }
   }
 
   const hit = bricks.find((brick) => brick.hp > 0 && touches(ball, brick));
-  if (hit) {
+  const piercing = pierceTime > 0;
+  if (hit && !piercing) {
     const left = hit.x - radius;
     const right = hit.x + hit.w + radius;
     const top = hit.y - radius;
@@ -431,16 +519,23 @@ function moveBall(ball, dt) {
       ball.y = oldY <= top || ball.y < hit.y + hit.h / 2 ? top - .01 : bottom + .01;
       ball.vy = ball.y < hit.y ? -Math.abs(ball.vy) : Math.abs(ball.vy);
     }
-    strike(hit, ball.hot);
+  }
+  if (hit) {
+    strike(hit, ball.hot, piercing);
     ball.hot = false;
   }
 
-  if (ball.y > height + radius && loadout.magnet && !spentNet) {
-    spentNet = true;
-    ball.y = paddleY - radius - 1;
-    ball.vy = -Math.abs(ball.vy);
-    say('ネットが落球を防いだ。このセクターでは使用済み。');
-    tone(300, .12);
+  const netContact = height - 19;
+  if (ball.vy > 0 && ball.y >= netContact && (bounceTime > 0 || serveGuard > 0 || loadout.magnet && !spentNet)) {
+    if (bounceTime <= 0) {
+      if (serveGuard > 0) serveGuard -= 1;
+      else spentNet = true;
+    }
+    const angle = remainingBricks <= 8 ? aimAtNearestBrick(ball.x, netContact)
+      : (width / 2 - ball.x) / width * .85 + Math.sign(ball.vx || 1) * .30;
+    const multiplier = bounceTime > 0 ? 1.22 : 1;
+    Object.assign(ball, createBall(ball.x, netContact, angle, multiplier), { y: netContact, hot: bounceTime > 0 });
+    tone(bounceTime > 0 ? 510 : 300, .07, 'triangle');
   }
   return ball.y <= height + radius;
 }
@@ -455,6 +550,9 @@ function simulate(dt) {
     particle.life -= dt;
   }
   particles = particles.filter(({ life }) => life > 0);
+  for (const beam of beams) beam.life -= dt;
+  beams = beams.filter(({ life }) => life > 0);
+  bannerTime -= dt;
   for (const burst of bursts) burst.life -= dt;
   bursts = bursts.filter(({ life }) => life > 0);
   if (mode === 'clearing') {
@@ -467,7 +565,11 @@ function simulate(dt) {
     hitFreeze -= dt;
     return;
   }
-  balls = balls.filter((ball) => moveBall(ball, dt));
+  pierceTime -= dt;
+  bounceTime -= dt;
+  balls = balls.filter((ball) => remainingBricks > 0 && moveBall(ball, dt));
+  balls.push(...pendingBalls);
+  pendingBalls.length = 0;
   if (remainingBricks === 0) {
     if (reducedMotion.matches) {
       sectorClear();
@@ -512,11 +614,31 @@ function paint() {
   for (let i = 0; i < 40; i++) {
     ctx.fillRect((i * 139 + 37) % width, (i * i * 61 + i * 143 + 95) % height, i % 5 ? 1 : 2, i % 5 ? 1 : 2);
   }
-  ctx.fillStyle = '#ff74764a';
-  ctx.fillRect(0, height - 17, width, 1);
-  if (loadout.magnet && !spentNet) {
-    ctx.fillStyle = '#77f2dc88';
-    ctx.fillRect(0, height - 12, width, 2);
+  ctx.fillStyle = bounceTime > 0 ? '#ffe17d' : serveGuard > 0 || loadout.magnet && !spentNet ? '#77f2dc88' : '#ff74764a';
+  ctx.fillRect(0, height - 19, width, bounceTime > 0 ? 3 : 1);
+
+  ctx.font = 'bold 13px system-ui, sans-serif';
+  ctx.fillStyle = '#d5e8fa';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.fillText(`残り  ${remainingBricks}`, 12, 25);
+  ctx.textAlign = 'right';
+  if (mode === 'play' || mode === 'clearing') ctx.fillText(`●  ${balls.length}`, width - 12, 25);
+
+  let timerX = 92;
+  for (const [power, time, duration] of [['pierce', pierceTime, 5], ['bounce', bounceTime, 6]]) {
+    if (time <= 0) continue;
+    const effect = powerups[power];
+    ctx.fillStyle = effect.color;
+    ctx.textAlign = 'left';
+    ctx.fillText(`${effect.glyph}  ${power === 'pierce' ? '貫通' : '超反射'}`, timerX, 23);
+    ctx.fillRect(timerX, 34, time / duration * 76, 2);
+    timerX += 94;
+  }
+  if (combo >= 4) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff1bd';
+    ctx.fillText(`${combo} HIT`, width / 2, height - 8);
   }
 
   for (const brick of bricks) {
@@ -524,10 +646,16 @@ function paint() {
     const { x, y, w, h, kind, hp } = brick;
     ctx.fillStyle = '#04081388';
     ctx.fillRect(x + 2, y + 3, w, h);
-    ctx.fillStyle = kind === 'core' ? '#fc956b' : kind === 'armor' && hp === 2 ? '#acb6d1' : brick.row % 2 ? dark : light;
+    ctx.fillStyle = powerups[brick.power]?.color ?? (kind === 'core' ? '#fc956b' : kind === 'armor' && hp === 2 ? '#acb6d1' : brick.row % 2 ? dark : light);
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = '#ffffff66';
     ctx.fillRect(x + 2, y + 2, w - 4, 2);
+    if (brick.power) {
+      ctx.fillStyle = '#17213d';
+      ctx.font = '900 17px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(powerups[brick.power].glyph, x + w / 2, y + h / 2 + 1);
+    }
     if (kind === 'core') {
       ctx.fillStyle = '#612b45';
       ctx.fillRect(x + w / 2 - 2, y + 6, 4, 12);
@@ -535,8 +663,8 @@ function paint() {
     }
     if (kind === 'armor') {
       ctx.strokeStyle = '#253453';
-      ctx.strokeRect(x + 5, y + 6, w - 10, h - 11);
-      if (hp === 2) ctx.strokeRect(x + 9, y + 9, w - 18, h - 17);
+      ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
+      if (hp === 2) ctx.strokeRect(x + 8, y + 8, w - 16, h - 16);
     }
     if (remainingBricks === 1) {
       ctx.strokeStyle = '#fff1bd';
@@ -557,10 +685,12 @@ function paint() {
 
   if (mode === 'ready') {
     const heading = launchHeading();
-    for (let i = 1; i <= 6; i++) {
-      circle(paddleX + Math.sin(heading) * i * 13, paddleY - 10 - Math.cos(heading) * i * 13, 2, '#97f6f1a0');
+    for (const offset of (loadout.quad ? upgradedSpread : launchSpread)) {
+      for (let i = 1; i <= 6; i++) {
+        circle(paddleX + offset * 13 + Math.sin(heading + offset) * i * 13, paddleY - 10 - Math.cos(heading + offset) * i * 13, 2, '#97f6f180');
+      }
+      circle(paddleX + offset * 29, paddleY - radius - 2 - Math.abs(offset) * 10, radius, '#eefcff');
     }
-    circle(paddleX, paddleY - radius - 1, radius, '#eefcff');
   }
 
   for (const burst of bursts) {
@@ -573,12 +703,41 @@ function paint() {
     ctx.fillRect(particle.x, particle.y, 3, 3);
   }
   ctx.globalAlpha = 1;
-  for (const ball of balls) {
-    if (ball.hot) {
-      circle(ball.x, ball.y, 10, '#ffb46d50');
-      circle(ball.x - ball.vx * .025, ball.y - ball.vy * .025, 4, '#ffb46d90');
+  for (const beam of beams) {
+    ctx.globalAlpha = beam.life / .34;
+    ctx.fillStyle = '#36caff55';
+    ctx.fillRect(beam.x - 43, 0, 86, paddleY);
+    for (const offset of [-29, 0, 29]) {
+      ctx.fillStyle = '#68d7ff';
+      ctx.fillRect(beam.x + offset - 4, 0, 8, paddleY);
+      ctx.fillStyle = '#effdff';
+      ctx.fillRect(beam.x + offset - 1, 0, 2, paddleY);
     }
-    circle(ball.x, ball.y, radius, ball.hot ? '#ffd399' : '#f3ffff');
+  }
+  ctx.globalAlpha = 1;
+  for (const ball of balls) {
+    const aura = pierceTime > 0 ? '#ff8abd' : ball.hot ? '#ffe17d' : '#88eaff';
+    if (!reducedMotion.matches) {
+      ctx.globalAlpha = .28;
+      circle(ball.x - ball.vx * .036, ball.y - ball.vy * .036, 3, aura);
+      ctx.globalAlpha = .58;
+      circle(ball.x - ball.vx * .017, ball.y - ball.vy * .017, 4, aura);
+      ctx.globalAlpha = 1;
+    }
+    if (pierceTime > 0 || ball.hot) circle(ball.x, ball.y, 8, null, aura);
+    circle(ball.x, ball.y, radius, '#f3ffff');
+  }
+  if (bannerTime > 0 && mode === 'play') {
+    ctx.globalAlpha = Math.min(1, bannerTime * 3);
+    ctx.fillStyle = '#0d192eee';
+    ctx.fillRect(77, 256, width - 154, 33);
+    ctx.strokeStyle = banner.color;
+    ctx.strokeRect(77, 256, width - 154, 33);
+    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = banner.color;
+    ctx.fillText(`${banner.glyph}  ${banner.label}`, width / 2, 273);
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -601,20 +760,35 @@ function pointPaddle(event) {
 
 canvas.addEventListener('pointerdown', (event) => {
   if (!event.isPrimary || event.button !== 0 || (mode !== 'ready' && mode !== 'play')) return;
-  dragId = event.pointerId;
+  drag = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
   canvas.setPointerCapture(event.pointerId);
   pointPaddle(event);
 });
 canvas.addEventListener('pointermove', (event) => {
-  if (event.pointerType === 'mouse' || event.pointerId === dragId) pointPaddle(event);
+  if (event.pointerId === drag?.id && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 9) drag.moved = true;
+  if (event.pointerType === 'mouse' || event.pointerId === drag?.id) pointPaddle(event);
 });
-canvas.addEventListener('lostpointercapture', () => { dragId = null; });
+canvas.addEventListener('pointerup', (event) => {
+  if (event.pointerId !== drag?.id) return;
+  const tapped = !drag.moved && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) <= 9;
+  drag = null;
+  pointPaddle(event);
+  if (tapped) launch();
+});
+for (const type of ['pointercancel', 'lostpointercapture']) {
+  canvas.addEventListener(type, () => { drag = null; });
+}
 
 action.addEventListener('click', playerAction);
 pause.addEventListener('click', togglePause);
 soundButton.addEventListener('click', () => {
   sound = !sound;
-  soundButton.setAttribute('aria-pressed', String(sound));
+  updateSoundButton();
+  try {
+    localStorage.setItem(soundKey, sound ? 'on' : 'off');
+  } catch {
+    // The current session still retains the setting.
+  }
   tone(380, .1);
 });
 document.addEventListener('keydown', (event) => {
@@ -640,5 +814,6 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && mode === 'play') togglePause();
 });
 
+updateSoundButton();
 start();
 requestAnimationFrame(frame);

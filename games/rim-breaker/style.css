@@ -75,6 +75,10 @@ canvas {
   touch-action: none;
 }
 
+canvas.is-ready {
+  cursor: crosshair;
+}
+
 .overlay {
   position: absolute;
   inset: 0;
