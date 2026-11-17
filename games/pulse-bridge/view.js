@@ -59,9 +59,9 @@ class BridgeView {
     ctx.fillText(text, x, y);
   }
 
-  bridge(time) {
+  bridge(time, night) {
     const { ctx, width, height } = this;
-    ctx.fillStyle = this.ocean;
+    ctx.fillStyle = night ? '#161634' : this.ocean;
     ctx.fillRect(0, 0, width, height);
     for (let i = 0; i < 110; i++) {
       const x = (i * 61 + 12) % width;
@@ -70,10 +70,10 @@ class BridgeView {
       ctx.fillRect(x, y, 8 + i % 28, 1 + (y > height / 2));
     }
     this.lane(0, 0, 180, 1.11, '#143246');
-    this.lane(0, 0, 180, 1.04, this.deck);
+    this.lane(0, 0, 180, 1.04, night ? '#4c4a68' : this.deck);
     for (const rail of [-1, 1]) {
       this.lane(rail, 0, 180, .037, '#405466');
-      this.lane(rail, 0, 180, .017, '#ccd9d9');
+      this.lane(rail, 0, 180, .017, night ? '#c88bff' : '#ccd9d9');
       for (let i = 12; i >= 0; i--) {
         const z = i * 7.4 - (time * 13 % 7.4);
         if (z < 0) continue;
@@ -127,26 +127,57 @@ class BridgeView {
   }
 
   warning(attack, time) {
+    const { ctx } = this;
     const left = attack.x - attack.half, right = attack.x + attack.half;
-    const hit = time >= attack.at;
-    const flash = !this.reduced.matches && Math.floor(time * 4) % 2 === 0;
-    this.lane(attack.x, 0, 90, attack.half, hit ? '#ff696be0' : flash ? '#f8446467' : '#d621493e');
-    this.lane(left, 0, 90, .012, '#ffaf95');
-    this.lane(right, 0, 90, .012, '#ffaf95');
-    const p = this.project(attack.x, 17);
-    if (!hit) this.text('!', p.x, p.y, 24, '#fff1ba', '#a53449');
+    const hit = attack.resolved;
+    const charge = Math.max(0, Math.min(1, 1 - (attack.at - time) / attack.duration));
+    const edge = attack.kind === 'mortar' ? '#ffca72' : '#ffa89b';
+    const far = attack.kind === 'mortar' ? 24 : 88;
+    ctx.globalAlpha = hit ? .92 - Math.min(.7, (time - attack.at) * 2.6) : .46 + charge * .34;
+    this.lane(attack.x, 0, far, attack.half, hit ? '#fa553f' : '#d62b4c9e');
+    this.lane(left, 0, far, .014, edge);
+    this.lane(right, 0, far, .014, edge);
+    this.lane(attack.x, 13 - 12 * charge, 17 - 12 * charge, attack.half, edge);
+    ctx.globalAlpha = 1;
+    const p = this.project(attack.x, 13);
+    if (!hit) this.text(attack.kind === 'mortar' ? '着弾' : attack.kind === 'ram' ? '突撃' : '!', p.x, p.y - 8, 18, '#fff4cf', '#8d2945');
+    else if (attack.kind === 'laser') this.lane(attack.x, 0, 79, .04, '#fff4bbcd');
   }
 
-  boss(boss, preview, exposed) {
+  enemy(enemy, scene) {
+    const { ctx } = this;
+    const { x, y, s } = this.project(enemy.x, enemy.z);
+    const firing = scene.warnings.some(warning => warning.source === enemy && !warning.resolved);
+    const armor = enemy.kind === 'ram' ? '#bb4251' : enemy.kind === 'mortar' ? '#df8a58' : '#a95c80';
+    const body = (points, color) => this.polygon(points.map(([dx, dy]) => [x + dx*s, y + dy*s]), color, '#47263f');
+    body([[-35, 0], [-31, -25], [-17, -35], [17, -35], [31, -25], [35, 0]], armor);
+    ctx.fillStyle = '#372b47';
+    ctx.fillRect(x - 36*s, y - 11*s, 72*s, 8*s);
+    if (enemy.kind === 'ram') {
+      body([[-33, -6], [-11, -10], [0, 7], [11, -10], [33, -6], [23, 10], [-23, 10]], '#e2a4a8');
+    } else if (enemy.kind === 'mortar') {
+      body([[-13, -17], [-8, -51], [11, -51], [15, -17]], '#73485e');
+    } else {
+      body([[-7, -22], [-6, -7], [8, -7], [7, -22]], '#f49491');
+    }
+    ctx.fillStyle = firing ? '#fff2a8' : '#ff6e80';
+    ctx.fillRect(x - 7*s, y - 26*s, 14*s, 6*s);
+    ctx.fillStyle = '#251e36';
+    ctx.fillRect(x - 27*s, y - 60*s, 54*s, 5*s);
+    ctx.fillStyle = '#ffb18d';
+    ctx.fillRect(x - 27*s, y - 60*s, 54*s * enemy.hp / enemy.maxHp, 5*s);
+  }
+
+  boss(boss, exposed) {
     const { ctx } = this;
     const p = this.project(boss.x, boss.z);
-    const x = p.x, y = p.y, s = p.s * (preview ? 1 : 1.2);
+    const x = p.x, y = p.y, s = p.s * 1.2;
     const path = (parts, fill, stroke) => this.polygon(parts.map(([a, b]) => [x + a*s, y + b*s]), fill, stroke);
     ctx.fillStyle = '#16304588';
     ctx.beginPath();
     ctx.ellipse(x, y + 5 * s, 100 * s, 17 * s, 0, 0, Math.PI * 2);
     ctx.fill();
-    const armor = exposed ? '#e49455' : preview ? '#945960' : '#b5686b';
+    const armor = exposed ? '#e49455' : boss.second ? '#645cb0' : '#b5686b';
     path([[-66, -31], [-70, -74], [-32, -116], [36, -116], [69, -74], [67, -31], [42,-10], [-45,-10]], armor, '#452f46');
     path([[-90,-65], [-67,-90], [-54,-69], [-48,-16], [-78,-5], [-99,-30]], '#72475d', '#462d43');
     path([[90,-65], [67,-90], [54,-69], [48,-16], [78,-5], [99,-30]], '#72475d', '#462d43');
@@ -160,7 +191,14 @@ class BridgeView {
     ctx.fillStyle = boss.aligned ? '#fff2b3' : '#ffd584';
     ctx.fill();
     this.polyArmorLine(x, y, s);
-    if (boss.aligned && !preview) this.text(exposed ? '装甲破壊 ×2' : 'コア命中', x, y - 181 * s, 14, '#fff2b3', '#472e46');
+    if (boss.second) {
+      for (const side of [-1, 1]) {
+        const a = side * 78;
+        path([[a-22,-67],[a-22,-134],[a+22,-134],[a+22,-67]], '#554887', '#342546');
+        path([[a-18,-132],[a-11,-145],[a+11,-145],[a+18,-132],[a+12,-118],[a-12,-118]], '#f8a1ec', '#473160');
+      }
+    }
+    if (boss.aligned) this.text(exposed ? '装甲破壊 ×2' : 'コア命中', x, y - 181 * s, 14, '#fff2b3', '#472e46');
   }
 
   polyArmorLine(x, y, s) {
@@ -181,7 +219,7 @@ class BridgeView {
     const { ctx } = this;
     const from = this.project(scene.x, 6);
     const target = this.project(scene.targetX, scene.targetZ);
-    const lift = scene.time >= scene.bossAt ? 80 * target.s : 18;
+    const lift = scene.boss ? 86 * target.s : 18;
     const power = Math.min(15, 4 + Math.floor(scene.power / 6));
     const wide = scene.drone ? 24 : 11;
     ctx.globalCompositeOperation = 'lighter';
@@ -190,7 +228,7 @@ class BridgeView {
       const x = from.x + (target.x - from.x) * progress + Math.sin(i * 2.45) * wide * (1 - progress * .55);
       const y = from.y + (target.y - from.y - lift) * progress - 12;
       ctx.strokeStyle = i % 5 ? '#21bfe9bd' : '#94f5ffe8';
-      ctx.lineWidth = scene.drone ? 4 : scene.boss.aligned ? 3 : 2;
+      ctx.lineWidth = scene.drone ? 4 : scene.boss?.aligned ? 3 : 2;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + (target.x - from.x) * .08, y - (scene.drone ? 27 : 15));
@@ -205,7 +243,7 @@ class BridgeView {
     const cols = Math.min(7, Math.max(3, Math.ceil(Math.sqrt(display * 1.35))));
     const rows = Math.ceil(display / cols);
     const origin = this.project(scene.x, 5);
-    const half = this.project(.055 + Math.min(.15, scene.units * .0025), 5).x - this.project(0, 5).x;
+    const half = this.project(squadSpread(scene.units), 5).x - this.project(0, 5).x;
     ctx.beginPath();
     ctx.ellipse(origin.x, origin.y + 22, half, 5, 0, 0, Math.PI * 2);
     ctx.fillStyle = '#15273cb0';
@@ -309,7 +347,7 @@ class BridgeView {
     const { ctx, width } = this;
     ctx.fillStyle = '#101d30e9';
     ctx.fillRect(68, 13, width - 136, 39);
-    this.text('橋の巨像', width / 2, 24, 13);
+    this.text(boss.name, width / 2, 24, 13);
     this.text(`${timeLeft}秒`, width - 112, 24, 13, '#ffe4a6');
     ctx.fillStyle = '#422939';
     ctx.fillRect(81, 35, width - 162, 9);
@@ -319,17 +357,20 @@ class BridgeView {
 
   draw(scene) {
     const { ctx } = this;
-    this.bridge(scene.travel);
+    this.bridge(scene.travel, scene.stage === 2);
     ctx.save();
     if (scene.impact && !this.reduced.matches) {
       ctx.translate(Math.sin(scene.impact * 97) * scene.impact * 17, Math.cos(scene.impact * 78) * scene.impact * 12);
     }
     for (const attack of scene.warnings) this.warning(attack, scene.time);
-    if (scene.boss && scene.boss.hp > 0) this.boss(scene.boss, scene.time < scene.bossAt, scene.time < scene.breakUntil);
+    if (scene.boss && scene.boss.hp > 0) this.boss(scene.boss, scene.time < scene.breakUntil);
     for (const row of [...scene.rows].reverse()) {
       const z = 5 + (row.at - scene.time) * 13;
       if (row.done || z < 0 || z > 100) continue;
       for (const option of row.options) if (!option.taken) this.gate(option.x, z, option);
+    }
+    for (const enemy of scene.enemies.filter(enemy => !enemy.gone && scene.time >= enemy.at).sort((a, b) => b.z - a.z)) {
+      this.enemy(enemy, scene);
     }
     this.beams(scene);
     this.squad(scene);

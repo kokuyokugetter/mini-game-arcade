@@ -167,3 +167,21 @@ button:focus-visible, canvas:focus-visible, a:focus-visible {
   background: linear-gradient(110deg, #ffae4c, #fff2a6 58%, #ffce67);
   box-shadow: 0 0 1rem #ffc95665, inset 0 0 0 2px #ffedac;
 }
+
+#stage {
+  padding: .16rem .5rem;
+  background: #0b1f34;
+  color: #8ee5e6;
+  font: 750 .72rem/1.4 system-ui, sans-serif;
+  letter-spacing: .09em;
+  text-align: center;
+}
+
+#restart:not([hidden]) {
+  display: block;
+  margin: .45rem auto 0;
+}
+
+.hud dd.critical {
+  color: #ff9a81;
+}

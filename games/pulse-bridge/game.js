@@ -6,18 +6,17 @@ const overlay = document.querySelector('#overlay');
 const title = document.querySelector('#overlay-title');
 const description = document.querySelector('#overlay-copy');
 const startButton = document.querySelector('#start');
+const restartButton = document.querySelector('#restart');
 const pulseButton = document.querySelector('#pulse');
 const pauseButton = document.querySelector('#pause');
 const soundButton = document.querySelector('#sound');
 const status = document.querySelector('#status');
+const stageLabel = document.querySelector('#stage');
 const progress = document.querySelector('#run-progress');
 const hud = Object.fromEntries(['units', 'chain', 'score', 'best'].map(id => [id, document.getElementById(id)]));
-const maximum = 60;
-const entrance = 24;
-const deadline = 49;
-const bossHealth = 4700;
+const maximum = 48;
 const fixedStep = 1 / 120;
-const bestKey = 'pulse-bridge-best';
+const bestKey = 'pulse-bridge-best-v3';
 const muteKey = 'pulse-bridge-sound';
 const normalize = new Intl.NumberFormat('ja-JP');
 const keys = new Set();
@@ -35,6 +34,7 @@ const storedBest = Number(load(bestKey));
 let best = Number.isSafeInteger(storedBest) && storedBest > 0 ? storedBest : 0;
 let nextSound = 0;
 let finishDelay = 0;
+let checkpoint;
 
 function load(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -54,53 +54,51 @@ function option(x, kind, amount) {
   return { x, kind, amount, label, hp, maxHp: hp, taken: false };
 }
 
-function course() {
-  const rail = (begin, x, length) => Array.from({ length }, (_, i) => ({
-    at: begin + i * .32, options: [option(x, 'small', 1)],
+function course(stage) {
+  const gate = (at, ...options) => ({ at, options });
+  const crew = (x, size) => option(x, 'crew', size);
+  const shield = x => option(x, 'shield', 1);
+  const drone = x => option(x, 'drone', stage === 1 ? 74 : 94);
+  const rail = (begin, x, length) => Array.from({ length }, (_, i) => gate(begin + i * .27, option(x, 'small', 1)));
+  const rows = stage === 1 ? [
+    gate(1, crew(0, 5)), gate(3, crew(-.67, 6), shield(.67)),
+    ...rail(5.2, .67, 6), gate(8, crew(-.67, 8), shield(.67)),
+    gate(12.6, crew(0, 7)), gate(15.5, crew(-.67, 8), drone(.67)),
+    ...rail(17, .67, 5), gate(21, crew(0, 6), shield(.67)),
+  ] : [
+    gate(1, crew(-.67, 5), shield(.67)), ...rail(3.8, .67, 5),
+    gate(7.2, crew(.67, 8), shield(-.67)), gate(11, crew(0, 6)),
+    gate(14.8, crew(-.67, 9), drone(.67)), ...rail(17.5, -.67, 5),
+    gate(21, shield(0), crew(.67, 7)), gate(24, crew(0, 5)),
+  ];
+  const waves = stage === 1 ? [
+    [1.4, -.63, 'gunner'], [4.3, .62, 'gunner'], [6.5, .04, 'mortar'],
+    [9.9, -.70, 'ram'], [12.1, .67, 'gunner'], [14.8, -.66, 'mortar'],
+    [17.6, 0, 'ram'], [19.1, .64, 'gunner'],
+  ] : [
+    [.9, .67, 'mortar'], [2, -.64, 'gunner'], [4.6, 0, 'ram'],
+    [6.4, -.67, 'mortar'], [7.3, .67, 'gunner'], [9.5, .50, 'ram'],
+    [11.5, .65, 'mortar'], [13.9, -.65, 'ram'], [15.1, -.67, 'gunner'],
+    [17, .67, 'mortar'], [19.1, -.54, 'ram'], [21.2, 0, 'mortar'],
+  ];
+  const hp = { gunner: 100, mortar: 138, ram: 195 };
+  const enemies = waves.map(([at, x, kind]) => ({
+    at, x, kind, hp: hp[kind] + (stage - 1) * 47, maxHp: hp[kind] + (stage - 1) * 47,
+    z: 64, nextAttack: at + 1.14, gone: false,
   }));
-  const rows = [
-    { at: 1.25, options: [option(0, 'crew', 5)] },
-    { at: 2.7, options: [option(-.67, 'crew', 8), option(.67, 'shield', 1)] },
-    ...rail(3.8, .67, 12),
-    { at: 8.5, options: [option(-.67, 'crew', 10), option(.67, 'shield', 1)] },
-    ...rail(9.4, -.67, 9),
-    { at: 14.4, options: [option(-.67, 'crew', 10), option(.67, 'drone', 46)] },
-    ...rail(15.3, .67, 11),
-    { at: 20.3, options: [option(-.67, 'shield', 1), option(.67, 'crew', 9)] },
-    { at: 22.6, options: [option(0, 'crew', 5)] },
-  ];
-  const attacks = [
-    [4.9, -.05, .28, 5],
-    [7.8, .67, .29, 7],
-    [10.3, -.05, .30, 6],
-    [12.5, -.67, .29, 8],
-    [15.2, 0, .30, 7],
-    [17.9, .17, .30, 8],
-    [19.1, .67, .32, 8],
-    [21.7, -.67, .31, 8],
-  ];
-  for (let n = 0; n < 12; n++) {
-    const at = entrance + 2 + n * 1.9;
-    const damage = 8 + Math.floor(n / 3) * 2;
-    const side = n % 2 ? 1 : -1;
-    if (n % 4 === 1) {
-      attacks.push([at, -.70, .27, damage], [at, .70, .27, damage]);
-    } else {
-      attacks.push([at, side * .60, .32, damage]);
-      if (n >= 4) attacks.push([at + .60, -side * .60, .34, damage]);
-    }
-  }
-  return { rows, attacks: attacks.map(([at, x, half, damage]) => ({ at, x, half, damage, resolved: false })) };
+  return { rows, enemies };
 }
 
-function createRun() {
-  const { rows, attacks } = course();
+function createRun(stage = 1, carry = {}) {
+  const { rows, enemies } = course(stage);
+  const bossAt = stage === 1 ? 23 : 26;
   return {
-    time: 0, travel: 0, x: 0, aim: 0, units: 8, power: 8, score: 0, shield: 0, ammo: 0,
-    rows, attacks, warnings: [], effects: [], firing: false, targetX: 0, targetZ: 80,
-    bossAt: entrance, deadline, boss: { x: 0, z: 86, hp: bossHealth, max: bossHealth, aligned: false }, drone: false,
-    charge: 75, chain: 0, peak: 0, rings: [], shot: null, impact: 0, breakUntil: 0,
-    lastDodge: -Infinity, lastHit: -Infinity, lastSpark: -Infinity, lastUpdate: -Infinity,
+    stage, time: 0, travel: 0, x: 0, aim: 0, units: carry.units ?? 8, power: 8,
+    score: carry.score ?? 0, shield: 0, ammo: 0, kills: 0, bossVolley: 0,
+    rows, enemies, warnings: [], effects: [], firing: false, targetX: 0, targetZ: 80,
+    bossAt, deadline: bossAt + (stage === 1 ? 27 : 33), boss: null, drone: false,
+    charge: carry.charge ?? 64, chain: 0, peak: carry.peak ?? 0, rings: [], shot: null, impact: 0,
+    breakUntil: 0, lastDodge: -Infinity, lastHit: -Infinity, lastSpark: -Infinity, lastUpdate: -Infinity,
   };
 }
 
@@ -157,6 +155,9 @@ function cue(kind) {
     tone(58, .46, .32, 0, 'sawtooth');
     tone(147, .35, .19, .025, 'square');
     [392, 523, 659, 784].forEach((note, index) => tone(note, .27, .12, index * .052));
+  } else if (kind === 'enemy') {
+    tone(126, .18, .145, 0, 'sawtooth');
+    tone(698, .14, .095, .035);
   } else if (kind === 'hit') {
     tone(109, .19, .14);
     tone(267, .092, .06, 0, 'square');
@@ -205,44 +206,36 @@ function damageBoss(amount) {
 }
 
 function firePulse() {
-  if (state !== 'play' || game.charge < 100) return;
+  if (state !== 'play' || game.charge < 100 || game.boss && game.time - game.bossAt < 1) return;
   game.charge = 0;
   game.impact = .38;
-  const bossFight = game.time >= entrance;
-  const aimed = Math.abs(game.boss.x - game.x) < .34;
-  const x = bossFight && aimed ? game.boss.x : game.x;
-  const z = bossFight ? game.boss.z : 56;
+  const boss = game.boss;
+  const aimed = boss && Math.abs(boss.x - game.x) < .31;
+  const x = aimed ? boss.x : game.x;
+  const z = boss ? boss.z : 62;
   const end = view.project(x, z);
-  game.shot = { from: view.project(game.x, 5), end, lift: bossFight ? 80 * end.s : 0, life: .46 };
+  game.shot = { from: view.project(game.x, 5), end, lift: boss ? 86 * end.s : 0, life: .46 };
   cue('pulse');
   ring(x, z, '#ffca62', 150, game.shot.lift);
-  if (bossFight) {
-    const damage = aimed ? 285 + game.units * 5 : 95;
+  if (boss) {
+    const damage = aimed ? 410 + game.units * 6 : 0;
     damageBoss(damage);
-    if (aimed) game.breakUntil = game.time + 2.5;
-    burst(x, z, '#ffda78', `${aimed ? '装甲破壊' : 'かすり'} −${damage}`, aimed ? 72 : 22, game.shot.lift);
-    say(aimed ? '装甲破壊。2.5秒間、射撃ダメージが2倍！' : 'コアを外した。巨像と同じレーンから撃てば装甲を壊せる。');
-    if (game.boss.hp <= 0) finish(true);
+    if (aimed) game.breakUntil = game.time + 3;
+    burst(x, z, '#ffda78', aimed ? `装甲破壊 −${damage}` : 'コアを外した', aimed ? 72 : 22, game.shot.lift);
+    say(aimed ? '装甲破壊。3秒間、射撃ダメージが2倍！' : 'コアと同じレーンからパルス砲を撃とう。');
+    if (boss.hp <= 0) finish(true);
   } else {
-    let rescued = 0;
-    for (const row of game.rows) {
-      if (row.done || row.at - game.time > 4) continue;
-      const item = row.options.find(option => option.kind === 'drone')
-        ?? row.options.filter(option => ['crew', 'small'].includes(option.kind))
-          .sort((a, b) => b.amount - a.amount)[0];
-      if (!item) continue;
-      reward(item, true);
-      row.done = true;
-      rescued += item.kind === 'drone' ? 1 : item.amount;
-    }
-    game.shield = 1;
-    burst(game.x, 5, '#ffe7a0', rescued ? '前方ゲートを回収！' : 'シールド展開！', 60);
-    say('パルス砲で前方を回収し、シールドを展開。');
+    const targets = game.enemies.filter(enemy => activeEnemy(enemy) && Math.abs(enemy.x - game.x) < .55);
+    for (const enemy of targets) damageEnemy(enemy, enemy.hp);
+    const canceled = game.warnings.filter(warning => warning.at > game.time && Math.abs(warning.x - game.x) < .55);
+    game.warnings = game.warnings.filter(warning => !canceled.includes(warning));
+    burst(game.x, 5, '#ffe7a0', targets.length ? `${targets.length}機を撃破！` : 'パルス砲', 48);
+    if (canceled.length) say('パルス砲で前方の攻撃を相殺。');
   }
   updateHud();
 }
 
-function reward(item, byPulse = false) {
+function reward(item) {
   item.taken = true;
   if (item.kind === 'shield') {
     game.shield = 1;
@@ -261,38 +254,73 @@ function reward(item, byPulse = false) {
     burst(item.x, 5, '#8affef', added ? `+${added}` : 'MAX', item.kind === 'small' ? 10 : 26);
     if (item.kind === 'crew') say(`増援 +${added}。赤い帯を見たら横へ避けよう。`);
   }
-  if (!byPulse) {
-    addCharge(item.kind === 'small' ? 3.5 : 12);
-    cue(item.kind);
-  }
+  addCharge(item.kind === 'small' ? 2 : 7);
+  cue(item.kind);
 }
 
-function attack(attackRow) {
-  if (game.time - game.lastHit < .2) return;
-  const spread = .055 + Math.min(.15, game.units * .0025);
-  const clearance = Math.abs(game.x - attackRow.x) - attackRow.half - spread;
-  if (clearance >= 0) {
-    if (clearance > .29 || game.time - game.lastDodge < .24) return;
-    game.lastDodge = game.time;
-    game.chain++;
-    game.peak = Math.max(game.peak, game.chain);
-    game.score += 180 * Math.min(game.chain, 8);
-    addCharge(25);
-    game.impact = Math.max(game.impact, .14);
-    ring(game.x, 5, '#85fff2', 77);
-    burst(game.x, 5, '#a4fff2', `ギリ避け ×${game.chain}`, 32);
-    if (game.time >= entrance) {
-      damageBoss(46 + game.chain * 8);
-      const end = view.project(game.boss.x, game.boss.z);
-      if (!game.shot) game.shot = { from: view.project(game.x, 5), end, lift: 80 * end.s, life: .30, counter: true };
+function squadSpread(units) {
+  return .048 + Math.min(.082, units * .002);
+}
+
+function clearance(attack) {
+  return Math.abs(game.x - attack.x) - attack.half - squadSpread(game.units);
+}
+
+function announceAttack(x, half, damage, delay, source, kind) {
+  game.warnings.push({
+    x, half, damage, source, kind, at: game.time + delay, duration: delay,
+    innerX: null, resolved: false,
+  });
+  tone(kind === 'ram' ? 164 : 310, .13, .07, 0, 'square');
+}
+
+function resolveAttacks() {
+  game.warnings = game.warnings.filter(attack => attack.at + .26 > game.time);
+  const incoming = [];
+  for (const warning of game.warnings) {
+    if (warning.resolved) continue;
+    if (game.time >= warning.at) incoming.push(warning);
+    else if (warning.at - game.time <= .46 && warning.innerX === null && clearance(warning) < 0) {
+      warning.innerX = game.x;
     }
-    cue('dodge');
-    say('ギリ避けでパルス充填。連続でかわすほど高得点！');
+  }
+  // One impact per volley, with hits taking precedence over any other strip.
+  const hit = incoming.find(warning => clearance(warning) < 0);
+  for (const warning of incoming) warning.resolved = true;
+  if (hit) {
+    if (game.time - game.lastHit >= .18) takeHit(hit);
     return;
   }
+  const dodge = incoming.find(warning => warning.innerX !== null
+    && Math.abs(game.x - warning.innerX) >= .16 && clearance(warning) < .26);
+  if (dodge && game.time - game.lastDodge >= .20) rewardDodge(dodge);
+}
+
+function rewardDodge(warning) {
+  game.lastDodge = game.time;
+  game.chain++;
+  game.peak = Math.max(game.peak, game.chain);
+  game.score += 180 * Math.min(game.chain, 8);
+  addCharge(22);
+  game.impact = Math.max(game.impact, .14);
+  ring(game.x, 5, '#85fff2', 77);
+  burst(game.x, 5, '#a4fff2', `ギリ避け ×${game.chain}`, 32);
+  const target = warning.source;
+  if (target?.hp > 0 && !target.gone) {
+    if (target === game.boss) damageBoss(48 + Math.min(game.chain, 8) * 7);
+    else damageEnemy(target, 65);
+    const end = view.project(target.x, target.z);
+    if (!game.shot) game.shot = { from: view.project(game.x, 5), end, lift: (target === game.boss ? 86 : 27) * end.s, life: .30, counter: true };
+  }
+  cue('dodge');
+  say('ギリ避け成功。反撃してパルス充填！');
+}
+
+function takeHit(attack) {
   game.lastHit = game.time;
-  game.impact = Math.max(game.impact, .2);
+  game.impact = Math.max(game.impact, .24);
   game.chain = 0;
+  ring(attack.x, 5, '#ff795e', 95);
   if (game.shield) {
     game.shield = 0;
     burst(game.x, 5, '#a9ffdc', 'ガード', 24);
@@ -300,12 +328,72 @@ function attack(attackRow) {
     say('シールドで攻撃を防ぎました。');
     return;
   }
-  const loss = Math.min(game.units, attackRow.damage);
+  const loss = Math.min(game.units, attack.damage);
   game.units -= loss;
-  burst(game.x, 5, '#ff9f97', `−${loss}`, 30);
+  const lostCharge = Math.min(14, Math.floor(game.charge));
+  game.charge = Math.max(0, game.charge - 14);
+  burst(game.x, 5, '#ff9f97', `機体 −${loss}`, 46);
   cue('hit');
-  say(`赤い攻撃帯に直撃。機体 −${loss}。`);
-  if (game.units === 0) finish(false, '赤い攻撃帯に当たり、機体が全滅しました。');
+  say(`${attack.kind === 'contact' ? '敵と接触' : '直撃'}。機体 −${loss}、パルス −${lostCharge}%。`);
+  if (game.units === 0) finish(false, '部隊が全滅しました。');
+}
+
+function activeEnemy(enemy) {
+  return !enemy.gone && game.time >= enemy.at;
+}
+
+function damageEnemy(enemy, damage) {
+  enemy.hp -= damage;
+  if (enemy.hp > 0) return;
+  enemy.gone = true;
+  // A fired shell stays live, but destroying the weapon cancels its charge.
+  game.warnings = game.warnings.filter(warning => warning.source !== enemy || warning.kind === 'mortar' || warning.resolved);
+  game.kills++;
+  game.score += enemy.kind === 'ram' ? 530 : 370;
+  game.units = Math.min(maximum, game.units + 2);
+  addCharge(10);
+  burst(enemy.x, enemy.z, '#ffce8a', '撃破 +2機', 26);
+  ring(enemy.x, enemy.z, '#ffa95e', 57);
+  cue('enemy');
+}
+
+function fightWaves(dt) {
+  let target;
+  for (const enemy of game.enemies) {
+    if (!activeEnemy(enemy)) continue;
+    const age = game.time - enemy.at;
+    enemy.z = enemy.kind === 'ram' ? 62 - age * 15 : 62 - age * 10;
+    if (game.time >= enemy.nextAttack) {
+      const second = game.stage === 2;
+      if (enemy.kind === 'ram') {
+        announceAttack(enemy.x, .31, second ? 16 : 12, 1.05, enemy, 'ram');
+        enemy.nextAttack = Infinity;
+      } else {
+        const mortar = enemy.kind === 'mortar';
+        announceAttack(mortar ? game.x : enemy.x, mortar ? .32 : .28,
+          (mortar ? 13 : 10) + (second ? 4 : 0), mortar ? .91 : .86, enemy, enemy.kind);
+        enemy.nextAttack += mortar ? 2.1 : 1.72;
+      }
+    }
+    if (enemy.z <= 5) {
+      enemy.gone = true;
+      if (Math.abs(enemy.x - game.x) < .22 + squadSpread(game.units) && game.time - game.lastHit >= .18) {
+        takeHit({ x: enemy.x, damage: game.stage === 2 ? 13 : 9, kind: 'contact' });
+        if (state !== 'play') return;
+      }
+      continue;
+    }
+    if (Math.abs(enemy.x - game.x) < (enemy.kind === 'ram' ? .33 : .29) && (!target || enemy.z < target.z)) target = enemy;
+  }
+  if (target) {
+    game.targetX = target.x;
+    game.targetZ = target.z;
+    damageEnemy(target, (17 + game.units * 4.2) * dt);
+    if (game.time - game.lastSpark > .11) {
+      game.lastSpark = game.time;
+      burst(target.x, target.z, '#b7f7ff', '', 6, 27 * view.project(0, target.z).s);
+    }
+  }
 }
 
 function move(dt) {
@@ -319,9 +407,8 @@ function resolveRows(dt) {
     if (row.done) continue;
     const until = row.at - game.time;
     const crate = row.options.find(item => item.kind === 'drone');
-    if (crate && until <= 2.65 && until >= 0 && Math.abs(crate.x - game.x) < .28) {
-      const activeDrone = game.ammo > 0 && game.time >= entrance;
-      crate.hp -= game.units * (activeDrone ? 3.5 : 2.65) * dt;
+    if (crate && game.targetZ === 95 && until <= 2.65 && until >= 0 && Math.abs(crate.x - game.x) < .28) {
+      crate.hp -= game.units * 2.65 * dt;
       game.targetZ = 5 + until * 13;
       game.targetX = crate.x;
       if (game.time - game.lastSpark > .11) {
@@ -342,52 +429,92 @@ function resolveRows(dt) {
   }
 }
 
+function deployBoss() {
+  const second = game.stage === 2;
+  const hp = second ? 6500 : 4200;
+  game.boss = {
+    x: 0, z: 39, hp, max: hp, aligned: false, nextAttack: game.time + 1.2,
+    name: second ? '要塞の双砲機' : '橋の巨像', second,
+  };
+  game.warnings = [];
+  game.enemies.forEach(enemy => { enemy.gone = true; });
+  say(second ? '双砲機出現。左右の挟撃と、隙間を狙う追撃に注意！' : '巨像出現。光るコアを撃ち、赤い予告が出たら横へ！');
+  tone(73, .42, .20, 0, 'sawtooth');
+}
+
+function bossAttack(boss, enraged) {
+  const n = game.bossVolley++;
+  const second = boss.second;
+  const damage = (second ? 16 : 12) + (enraged ? 3 : 0);
+  if (second && n % 3 === 1) {
+    announceAttack(-.72, .26, damage, .87, boss, 'laser');
+    announceAttack(.72, .26, damage, .87, boss, 'laser');
+    announceAttack(0, .27, damage, 1.51, boss, 'laser');
+    boss.nextAttack += enraged ? 1.85 : 2.15;
+  } else {
+    announceAttack(game.x, second ? .34 : .28, damage, second ? .86 : .99, boss, 'laser');
+    if (enraged && n % 2 === 0) {
+      const side = game.x > 0 ? -.69 : .69;
+      announceAttack(side, .25, damage, 1.55, boss, 'laser');
+    }
+    boss.nextAttack += second ? 1.69 : enraged ? 1.82 : 2.35;
+  }
+}
+
 function fightBoss(dt) {
-  const bossTime = game.time - entrance;
-  game.boss.z = 19 + Math.max(0, 1 - bossTime) * 6;
-  const enraged = game.boss.hp < game.boss.max * .45;
-  game.boss.x = Math.sin(bossTime * .83 + (enraged ? Math.sin(bossTime * 2) * .44 : 0)) * .65;
-  game.targetZ = game.boss.z;
+  const boss = game.boss;
+  const time = game.time - game.bossAt;
+  boss.z = 20 + Math.max(0, 1.1 - time) * 17;
+  const enraged = boss.hp < boss.max * .46;
+  if (boss.second) {
+    const lane = [-.66, .66, 0, .66, -.66, 0][Math.floor(time / (enraged ? 1.43 : 1.92)) % 6];
+    boss.x += clamp(lane - boss.x, -1.7 * dt, 1.7 * dt);
+  } else {
+    boss.x = Math.sin(time * .97) * .65;
+  }
+  if (game.time >= boss.nextAttack) bossAttack(boss, enraged);
+  game.targetZ = boss.z;
   game.drone = game.ammo > 0;
   if (game.drone) game.ammo = Math.max(0, game.ammo - dt);
-  const aligned = game.boss.aligned = Math.abs(game.x - game.boss.x) < .32;
-  game.targetX = aligned ? game.boss.x : game.x;
+  const aligned = boss.aligned = Math.abs(game.x - boss.x) < .30;
+  game.targetX = aligned ? boss.x : game.x;
   const exposed = game.time < game.breakUntil;
-  const scale = (aligned ? 3.4 : .27) * (game.drone ? 1.45 : 1) * (exposed ? 2 : 1);
-  damageBoss(game.units * scale * dt);
-  if (aligned) addCharge((5.5 + Math.min(3, game.units / 18)) * dt);
-  if (aligned && game.time - game.lastSpark > .10) {
-    game.lastSpark = game.time;
-    burst(game.boss.x, game.boss.z, '#94eeff', '', exposed ? 18 : game.drone ? 9 : 4, 80 * view.project(0, game.boss.z).s);
+  if (time >= 1 && aligned) {
+    damageBoss((10 + game.units * 4.7) * (game.drone ? 1.45 : 1) * (exposed ? 2 : 1) * dt);
+    addCharge((6 + Math.min(3, game.units / 15)) * dt);
+    if (game.time - game.lastSpark > .10) {
+      game.lastSpark = game.time;
+      burst(boss.x, boss.z, '#94eeff', '', exposed ? 18 : game.drone ? 9 : 4, 86 * view.project(0, boss.z).s);
+    }
   }
-  if (game.boss.hp <= 0) finish(true);
 }
 
 function tick(dt) {
   if (state !== 'play') return;
   game.time += dt;
-  game.travel = game.time < entrance ? game.time : entrance;
+  game.travel = Math.min(game.time, game.bossAt);
   move(dt);
   game.firing = true;
   game.targetX = game.x;
   game.targetZ = 95;
-  game.warnings = game.attacks.filter(row => row.at - game.time <= 1.14 && row.at - game.time > -.23);
-  const incoming = game.warnings.filter(row => !row.resolved && game.time >= row.at);
-  // A split volley resolves the closest strip first, so a hit cannot also count as a dodge.
-  incoming.sort((a, b) => Math.abs(game.x - a.x) - Math.abs(game.x - b.x));
-  for (const row of incoming) {
-    row.resolved = true;
-    attack(row);
-    if (state !== 'play') return;
-  }
-  resolveRows(dt);
-  if (game.time >= entrance) {
-    if (game.time - dt < entrance) say('ボス戦。赤い帯を避けながら、光るコアに射線を合わせてパルス砲を叩き込もう。');
+  if (game.time >= game.bossAt) {
+    if (!game.boss) deployBoss();
     fightBoss(dt);
   } else {
-    game.boss.z = 19 + (entrance - game.time) * 2.4;
+    fightWaves(dt);
+    if (state !== 'play') return;
+    resolveRows(dt);
   }
-  if (state === 'play' && game.time >= deadline) finish(false, '時間切れ。増援を集め、ボスのコアに射線を合わせよう。');
+  resolveAttacks();
+  if (state !== 'play') return;
+  if (game.boss?.hp <= 0) {
+    finish(true);
+    return;
+  }
+  if (game.time >= game.deadline) {
+    finish(false, '時間切れ。パルス砲でコアを割り、装甲が開いている間に撃ち込もう。');
+    return;
+  }
   stepEffects(dt);
   if (game.time - game.lastUpdate >= .10) {
     game.lastUpdate = game.time;
@@ -414,14 +541,16 @@ function stepEffects(dt) {
 function updateHud() {
   game.power = Math.round(game.units * (game.drone ? 1.45 : 1));
   hud.units.textContent = game.units;
+  hud.units.classList.toggle('critical', game.units > 0 && game.units <= 12);
   hud.chain.textContent = `×${game.chain}`;
   const charged = game.charge >= 100;
-  pulseButton.disabled = state !== 'play' || !charged;
+  pulseButton.disabled = state !== 'play' || !charged || Boolean(game.boss && game.time - game.bossAt < 1);
   pulseButton.textContent = charged ? '⚡ パルス砲 発射' : `パルス砲 ${Math.floor(game.charge)}%`;
   pulseButton.style.setProperty('--charge', `${game.charge}%`);
   hud.score.textContent = normalize.format(Math.floor(game.score));
   hud.best.textContent = normalize.format(best);
-  progress.value = Math.min(100, game.time / entrance * 100);
+  stageLabel.textContent = game.stage === 1 ? '01 / 海上橋' : '02 / 夜の要塞';
+  progress.value = Math.min(100, game.time / game.bossAt * 100);
   pauseButton.disabled = state !== 'play';
 }
 
@@ -429,12 +558,13 @@ function openPanel(heading, text, action) {
   title.textContent = heading;
   description.textContent = text;
   startButton.textContent = action;
+  restartButton.hidden = state !== 'defeat' || game.stage !== 2;
   overlay.hidden = false;
   title.focus({ preventScroll: true });
 }
 
 function finish(won, reason) {
-  state = won ? 'victory' : 'defeat';
+  state = won ? (game.stage === 1 ? 'stage-clear' : 'victory') : 'defeat';
   keys.clear();
   pointer = null;
   game.firing = false;
@@ -443,7 +573,7 @@ function finish(won, reason) {
     game.impact = .55;
     ring(game.boss.x, game.boss.z, '#fff1bc', 212, 55);
     ring(game.boss.x, game.boss.z, '#ff8c49', 260, 30);
-    game.score += game.units * 90 + Math.max(0, deadline - game.time) * 56;
+    game.score += game.units * 90 + Math.max(0, game.deadline - game.time) * 56;
     burst(game.boss.x, game.boss.z, '#ffe8ae', '撃破', 88, 62);
   }
   const score = Math.floor(game.score);
@@ -453,15 +583,26 @@ function finish(won, reason) {
   }
   updateHud();
   const info = `${reason} ${normalize.format(score)}点`;
-  if (!won) openPanel('作戦終了', info, 'もう一度出撃');
-  say(won ? '海上橋を突破しました。' : reason);
+  if (!won) openPanel('作戦終了', info, game.stage === 2 ? '2面をリトライ' : 'もう一度出撃');
+  say(won ? (game.stage === 1 ? '海上橋を突破。次は夜の要塞。' : '全2面を突破！') : reason);
   cue(won ? 'win' : 'loss');
 }
 
 function start() {
   const resuming = state === 'paused';
   if (!resuming) {
-    game = createRun();
+    if (state === 'stage-clear') {
+      checkpoint = {
+        units: clamp(game.units + 6, 20, 30),
+        charge: 48, score: game.score, peak: game.peak,
+      };
+      game = createRun(2, checkpoint);
+    } else if (state === 'defeat' && game.stage === 2) {
+      game = createRun(2, checkpoint);
+    } else {
+      checkpoint = undefined;
+      game = createRun();
+    }
     nextSound = 0;
     finishDelay = 0;
   }
@@ -471,7 +612,7 @@ function start() {
   accumulator = 0;
   overlay.hidden = true;
   updateHud();
-  say(resuming ? '作戦再開。' : '青いゲートで増援。赤い帯の外へ避けよう。');
+  say(resuming ? '作戦再開。' : '敵と同じレーンで攻撃。赤い帯の外へ避けよう。');
   board.focus({ preventScroll: true });
 }
 
@@ -501,7 +642,7 @@ function frame(now) {
       accumulator -= fixedStep;
     }
     view.draw(game);
-  } else if (state === 'victory' || state === 'defeat') {
+  } else if (state === 'victory' || state === 'stage-clear' || state === 'defeat') {
     if (game.effects.length || game.rings.length || game.shot || game.impact) {
       stepEffects(dt);
       view.draw(game);
@@ -510,7 +651,11 @@ function frame(now) {
       finishDelay -= dt;
       if (finishDelay <= 0) {
         const score = normalize.format(Math.floor(game.score));
-        openPanel('巨像撃破！', `${game.time.toFixed(1)}秒 · 生存 ${game.units}機 · 最大連鎖 ×${game.peak} · ${score}点`, 'もう一度出撃');
+        if (state === 'stage-clear') {
+          openPanel('1面クリア！', `生存 ${game.units}機 · ${score}点。部隊を補給して夜の要塞へ。`, '2面へ');
+        } else {
+          openPanel('全2面クリア！', `生存 ${game.units}機 · 最大連鎖 ×${game.peak} · ${score}点`, '1面から出撃');
+        }
       }
     }
   }
@@ -519,6 +664,10 @@ function frame(now) {
 }
 
 startButton.addEventListener('click', start);
+restartButton.addEventListener('click', () => {
+  state = 'ready';
+  start();
+});
 pauseButton.addEventListener('click', pause);
 pulseButton.addEventListener('click', () => {
   board.focus({ preventScroll: true });
