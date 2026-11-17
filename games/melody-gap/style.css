@@ -168,6 +168,8 @@ button.primary:enabled:hover { background: #832a23; }
 }
 
 .half .head { background: var(--paper); }
+.whole .head { transform: none; }
+.whole .stem { display: none; }
 
 .stem {
   position: absolute;
@@ -179,7 +181,7 @@ button.primary:enabled:hover { background: #832a23; }
 }
 
 .down .stem { left: 0; right: auto; bottom: auto; top: 4px; }
-.flag .stem::after {
+.flag .stem::after, .double-flag .stem::before {
   content: "";
   position: absolute;
   width: 9px;
@@ -188,6 +190,8 @@ button.primary:enabled:hover { background: #832a23; }
   border-radius: 0 90% 70% 0;
 }
 .flag.down .stem::after { bottom: 0; transform: scaleY(-1); }
+.double-flag .stem::before { top: 6px; }
+.double-flag.down .stem::before { top: auto; bottom: 6px; transform: scaleY(-1); }
 
 .ledger {
   position: absolute;
@@ -203,6 +207,7 @@ button.primary:enabled:hover { background: #832a23; }
 .gap { color: var(--red); }
 .gap .head { background: var(--paper); border-style: dashed; }
 .gap.solved .head { background: currentColor; border-style: solid; }
+.gap.solved.half .head { background: var(--paper); }
 
 .question {
   display: grid;

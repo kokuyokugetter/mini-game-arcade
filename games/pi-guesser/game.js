@@ -179,7 +179,7 @@ ui.next.addEventListener("click", () => {
   roundIndex++;
   if (roundIndex === ROUND_COUNT) startGame();
   else renderRound();
-  ui.guess.focus();
+  ui.viewport.focus({ preventScroll: true });
 });
 ui.difficulty.addEventListener("change", startGame);
 startGame();

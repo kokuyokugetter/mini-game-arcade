@@ -146,3 +146,24 @@ button:focus-visible, canvas:focus-visible, a:focus-visible {
   border-color: #81dae6;
   background: #81dae6;
 }
+
+#pulse {
+  display: block;
+  width: calc(100% - .9rem);
+  margin: .45rem .45rem 0;
+  min-height: 2.8rem;
+  border-color: #61d4d9;
+  background: linear-gradient(90deg, #226c7a var(--charge, 75%), #1a3148 var(--charge, 75%));
+  color: #effdff;
+  font-size: .96rem;
+  touch-action: manipulation;
+}
+
+#pulse:disabled { opacity: .88; }
+
+#pulse:not(:disabled) {
+  color: #2d160b;
+  border-color: #fff1a9;
+  background: linear-gradient(110deg, #ffae4c, #fff2a6 58%, #ffce67);
+  box-shadow: 0 0 1rem #ffc95665, inset 0 0 0 2px #ffedac;
+}

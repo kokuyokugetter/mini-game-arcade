@@ -1,4 +1,4 @@
-import { songs } from './songs.js?v=2';
+import { songs } from './songs.js?v=3';
 import { playTone, startAudio, voiceNames } from './audio.js?v=2';
 
 const $ = id => document.getElementById(id);
@@ -79,8 +79,10 @@ function drawNote(note, index, existing) {
   const hidden = gap && !chosen;
   element.className = 'note';
   element.classList.toggle('half', note.beats >= 2);
+  element.classList.toggle('whole', note.beats === 4);
   element.classList.toggle('down', y <= 86);
-  element.classList.toggle('flag', note.beats === .5);
+  element.classList.toggle('flag', note.beats < 1);
+  element.classList.toggle('double-flag', note.beats === .25);
   element.classList.toggle('gap', gap);
   element.classList.toggle('question', hidden);
   element.classList.toggle('solved', gap && solved);
@@ -97,7 +99,7 @@ function drawNote(note, index, existing) {
     }
     element.append(part('head'), part('stem'));
     if (pitchNames[value % 12].endsWith('♯')) element.append(part('accidental', '♯'));
-    if (note.beats % 1 === .5 && note.beats > 1 || note.beats === 3) {
+    if ([.75, 1.5, 3].includes(note.beats)) {
       element.append(part('dot', '·'));
     }
   }
@@ -137,9 +139,9 @@ function reset(sameSong) {
   const question = challenge?.questions[challenge.index];
   song = songs[question?.songIndex ?? Number(songPicker.value)];
   duration = 0;
-  score = song.score.map(([pitch, beats]) => {
+  score = song.score.map(([pitch, beats, rest = 0]) => {
     const note = { pitch, beats, beat: duration };
-    duration += beats;
+    duration += beats + rest;
     return note;
   });
   const candidates = score.map((_, index) => index).slice(2, -2).filter(index => index !== previous);

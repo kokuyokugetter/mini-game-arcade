@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#101d2c">
   <title>パルス・ブリッジ | ゲッタ〜クソゲーの墓場</title>
   <link rel="stylesheet" href="../../assets/site.css?v=2">
-  <link rel="stylesheet" href="./style.css">
-  <script src="./view.js" defer></script>
-  <script src="./game.js" defer></script>
+  <link rel="stylesheet" href="./style.css?v=2">
+  <script src="./view.js?v=2" defer></script>
+  <script src="./game.js?v=2" defer></script>
 </head>
 <body class="game-surface">
   <main>
@@ -18,12 +18,12 @@
     </nav>
     <header>
       <h1>パルス・ブリッジ</h1>
-      <p>部隊を育てて、海上橋をふさぐ巨像を突破。</p>
+      <p>ギリギリでかわして、巨像の装甲をぶち抜け。</p>
     </header>
     <section class="cabinet" aria-label="ゲーム画面">
       <dl class="hud">
         <div><dt>機体</dt><dd id="units">8</dd></div>
-        <div><dt>火力</dt><dd id="power">8</dd></div>
+        <div><dt>連続回避</dt><dd id="chain">×0</dd></div>
         <div><dt>スコア</dt><dd id="score">0</dd></div>
         <div><dt>ベスト</dt><dd id="best">0</dd></div>
       </dl>
@@ -33,13 +33,14 @@
         <div class="overlay" id="overlay">
           <div class="card">
             <h2 id="overlay-title" tabindex="-1">出撃準備</h2>
-            <p id="overlay-copy">左右に動いて機体を増やし、赤い攻撃範囲をよけよう。射撃は自動。</p>
+            <p id="overlay-copy">青いゲートで増援。赤い帯をギリギリでかわしてパルスを溜め、巨像のコアに合わせて撃て！</p>
             <button id="start" type="button">出撃する</button>
           </div>
         </div>
       </div>
+      <button id="pulse" type="button" disabled>パルス砲 75%</button>
       <div class="controls">
-        <p id="status" role="status">画面をドラッグ・マウス移動・← → キーで操作。</p>
+        <p id="status" role="status">左右移動はドラッグ・← →。パルス砲はボタン・Space。</p>
         <button id="pause" type="button" disabled>一時停止</button>
       </div>
     </section>

@@ -137,7 +137,7 @@ class BridgeView {
     if (!hit) this.text('!', p.x, p.y, 24, '#fff1ba', '#a53449');
   }
 
-  boss(boss, preview) {
+  boss(boss, preview, exposed) {
     const { ctx } = this;
     const p = this.project(boss.x, boss.z);
     const x = p.x, y = p.y, s = p.s * (preview ? 1 : 1.2);
@@ -146,7 +146,7 @@ class BridgeView {
     ctx.beginPath();
     ctx.ellipse(x, y + 5 * s, 100 * s, 17 * s, 0, 0, Math.PI * 2);
     ctx.fill();
-    const armor = preview ? '#945960' : '#b5686b';
+    const armor = exposed ? '#e49455' : preview ? '#945960' : '#b5686b';
     path([[-66, -31], [-70, -74], [-32, -116], [36, -116], [69, -74], [67, -31], [42,-10], [-45,-10]], armor, '#452f46');
     path([[-90,-65], [-67,-90], [-54,-69], [-48,-16], [-78,-5], [-99,-30]], '#72475d', '#462d43');
     path([[90,-65], [67,-90], [54,-69], [48,-16], [78,-5], [99,-30]], '#72475d', '#462d43');
@@ -160,7 +160,7 @@ class BridgeView {
     ctx.fillStyle = boss.aligned ? '#fff2b3' : '#ffd584';
     ctx.fill();
     this.polyArmorLine(x, y, s);
-    if (boss.aligned && !preview) this.text('コア命中 ×2.3', x, y - 181 * s, 14, '#fff2b3', '#472e46');
+    if (boss.aligned && !preview) this.text(exposed ? '装甲破壊 ×2' : 'コア命中', x, y - 181 * s, 14, '#fff2b3', '#472e46');
   }
 
   polyArmorLine(x, y, s) {
@@ -205,6 +205,14 @@ class BridgeView {
     const cols = Math.min(7, Math.max(3, Math.ceil(Math.sqrt(display * 1.35))));
     const rows = Math.ceil(display / cols);
     const origin = this.project(scene.x, 5);
+    const half = this.project(.055 + Math.min(.15, scene.units * .0025), 5).x - this.project(0, 5).x;
+    ctx.beginPath();
+    ctx.ellipse(origin.x, origin.y + 22, half, 5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#15273cb0';
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#bdfff1';
+    ctx.stroke();
     if (scene.shield) {
       ctx.beginPath();
       ctx.ellipse(origin.x, origin.y - 10, 32 + cols * 4, 29, 0, 0, Math.PI * 2);
@@ -247,6 +255,43 @@ class BridgeView {
     ctx.fillRect(x+2,y+1,4,4);
   }
 
+  shockwaves(scene) {
+    const { ctx } = this;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const ring of scene.rings) {
+      const strength = ring.life / ring.duration;
+      const radius = ring.size * (this.reduced.matches ? .58 : .12 + (1 - strength) * .88);
+      ctx.globalAlpha = strength;
+      ctx.strokeStyle = ring.color;
+      ctx.lineWidth = 2 + strength * 6;
+      for (const scale of [.64, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(ring.x, ring.y, radius * scale, radius * scale * .44, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    const shot = scene.shot;
+    if (shot) {
+      const strength = Math.min(1, shot.life * 4);
+      ctx.globalAlpha = strength;
+      ctx.lineCap = 'round';
+      const beam = ctx.createLinearGradient(shot.from.x, shot.from.y, shot.end.x, shot.end.y - shot.lift);
+      beam.addColorStop(0, shot.counter ? '#47d4ff' : '#ff9c40');
+      beam.addColorStop(1, shot.counter ? '#8bfff1' : '#fff2ab');
+      ctx.beginPath();
+      ctx.moveTo(shot.from.x, shot.from.y - 12);
+      ctx.lineTo(shot.end.x, shot.end.y - shot.lift);
+      ctx.strokeStyle = beam;
+      ctx.lineWidth = (shot.counter ? 13 : 39) * strength;
+      ctx.stroke();
+      ctx.strokeStyle = '#fffce3';
+      ctx.lineWidth *= .36;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   effects(effects) {
     const { ctx } = this;
     for (const effect of effects) {
@@ -273,9 +318,14 @@ class BridgeView {
   }
 
   draw(scene) {
+    const { ctx } = this;
     this.bridge(scene.travel);
+    ctx.save();
+    if (scene.impact && !this.reduced.matches) {
+      ctx.translate(Math.sin(scene.impact * 97) * scene.impact * 17, Math.cos(scene.impact * 78) * scene.impact * 12);
+    }
     for (const attack of scene.warnings) this.warning(attack, scene.time);
-    if (scene.boss && scene.boss.hp > 0) this.boss(scene.boss, scene.time < scene.bossAt);
+    if (scene.boss && scene.boss.hp > 0) this.boss(scene.boss, scene.time < scene.bossAt, scene.time < scene.breakUntil);
     for (const row of [...scene.rows].reverse()) {
       const z = 5 + (row.at - scene.time) * 13;
       if (row.done || z < 0 || z > 100) continue;
@@ -283,7 +333,9 @@ class BridgeView {
     }
     this.beams(scene);
     this.squad(scene);
+    this.shockwaves(scene);
     this.effects(scene.effects);
+    ctx.restore();
     if (scene.boss && scene.time >= scene.bossAt) this.bossBar(scene.boss, Math.max(0, Math.ceil(scene.deadline - scene.time)));
   }
 }
