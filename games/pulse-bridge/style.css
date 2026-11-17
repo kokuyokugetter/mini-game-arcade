@@ -1,0 +1,148 @@
+:root {
+  background: #101d2c;
+  color: #eef7ff;
+}
+
+main {
+  max-width: 31rem;
+  padding-block: .75rem 1rem;
+}
+
+nav, .controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .45rem .65rem;
+}
+
+a { color: #abe5ef; font-size: .86rem; }
+
+header {
+  margin: .65rem 0 .75rem;
+  padding-bottom: .55rem;
+  border-color: #3d8795;
+}
+
+h1 {
+  font-size: clamp(1.75rem, 7vw, 2.65rem);
+  letter-spacing: -.055em;
+}
+
+header p, #status {
+  font-size: .8rem;
+  color: #c2d8eb;
+}
+
+.cabinet {
+  overflow: hidden;
+  border: 1px solid #43617d;
+  border-radius: .8rem;
+  background: #142940;
+}
+
+.hud {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: .45rem .1rem .46rem;
+  text-align: center;
+}
+
+.hud dt {
+  color: #b7d7ec;
+  font-size: .73rem;
+}
+
+.hud dd {
+  margin: 0;
+  color: #f3fbff;
+  font: 800 clamp(.9rem, 3.7vw, 1.24rem) ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+progress {
+  display: block;
+  width: 100%;
+  height: .26rem;
+  border: 0;
+  color: #62d8e4;
+  background: #2e4058;
+  accent-color: #62d8e4;
+}
+
+progress::-webkit-progress-bar { background: #2e4058; }
+progress::-webkit-progress-value { background: #62d8e4; }
+
+.field {
+  position: relative;
+  background: #153547;
+}
+
+canvas {
+  display: block;
+  width: min(100%, 53svh);
+  height: auto;
+  margin-inline: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.overlay {
+  position: absolute;
+  inset: auto 0 6%;
+  display: grid;
+  justify-items: center;
+  padding: .5rem;
+}
+
+.overlay[hidden] { display: none; }
+
+.card {
+  width: min(82%, 20rem);
+  padding: .65rem .85rem .85rem;
+  box-sizing: border-box;
+  border: 1px solid #77c5d5;
+  border-radius: .55rem;
+  background: #15293df5;
+  text-align: center;
+  box-shadow: 0 7px 23px #061724b0;
+}
+
+.card h2 {
+  font-size: clamp(1.05rem, 5vw, 1.42rem);
+}
+
+.card h2:focus { outline: none; }
+.card p { margin: .25rem 0 .6rem; color: #d6edf7; font-size: .82rem; }
+
+.controls {
+  padding: .45rem;
+}
+
+.controls p { margin: 0; }
+
+button {
+  min-height: 2.55rem;
+  padding: .3rem .65rem;
+  border: 1px solid #6487a4;
+  border-radius: .4rem;
+  color: inherit;
+  background: #263f5a;
+  font: 700 .82rem/1.25 system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+button:disabled { opacity: .55; cursor: default; }
+button:focus-visible, canvas:focus-visible, a:focus-visible {
+  outline: 2px solid #7ceaf2;
+  outline-offset: 2px;
+}
+
+#start {
+  min-width: min(100%, 9rem);
+  color: #132a3a;
+  border-color: #81dae6;
+  background: #81dae6;
+}
