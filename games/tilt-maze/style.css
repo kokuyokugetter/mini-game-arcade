@@ -92,6 +92,12 @@ canvas {
 
 #time { font-weight: 700; min-width: 4.5em; }
 #status { min-height: 2.5em; }
+.objective {
+  color: #e6e8c9;
+  font-size: .82rem;
+  line-height: 1.4;
+  margin-top: .55rem;
+}
 .help { margin-top: .65rem; }
 
 .win {
