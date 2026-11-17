@@ -1,5 +1,5 @@
-import { songs } from './songs.js';
-import { playTone, startAudio } from './audio.js';
+import { songs } from './songs.js?v=2';
+import { playTone, startAudio, voiceNames } from './audio.js?v=2';
 
 const $ = id => document.getElementById(id);
 const sheet = $('sheet');
@@ -8,6 +8,9 @@ const seek = $('seek');
 const status = $('status');
 const play = $('play');
 const songPicker = $('song');
+const modePicker = $('mode');
+const voicePicker = $('voice');
+const speedPicker = $('speed');
 const minPitch = 57;
 const maxPitch = 76;
 const beatWidth = 64;
@@ -24,6 +27,7 @@ let position;
 let pitch;
 let chosen;
 let solved;
+let challenge;
 let unlocked;
 let playback;
 let audio;
@@ -34,6 +38,21 @@ let wheelPitch = 0;
 
 for (const [index, item] of songs.entries()) {
   songPicker.add(new Option(item.name, index));
+}
+for (const [id, name] of Object.entries(voiceNames)) {
+  voicePicker.add(new Option(name, id));
+}
+
+function currentVoice() {
+  return voicePicker.value === 'auto' ? song.voice : voicePicker.value;
+}
+
+function makeChallenge() {
+  const pool = songs.flatMap((item, songIndex) =>
+    item.score.slice(2, -2).map((_, index) => ({ songIndex, gap: index + 2 })));
+  const questions = Array.from({ length: 10 }, () =>
+    pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return { questions, index: 0, correct: 0 };
 }
 
 function namePitch(value) {
@@ -90,11 +109,21 @@ function setPosition(beat) {
   notes.style.transform = 'translateX(' + (-position * beatWidth) + 'px)';
   seek.value = position;
   seek.setAttribute('aria-valuetext', position < 0 ? '曲の手前' : position.toFixed(1) + '拍目');
+  $('resume').disabled = position >= duration;
 }
 
 function updateControls() {
-  play.textContent = playback ? '■ 停止' : (unlocked ? '▶ もう一度聴く' : '▶ 曲を聴く');
-  for (const id of ['previous', 'next', 'seek']) $(id).disabled = !unlocked;
+  $('stop').disabled = !playback;
+  $('song-field').hidden = Boolean(challenge);
+  $('round').hidden = !challenge;
+  $('reset').hidden = Boolean(challenge);
+  $('advance').hidden = !challenge || !solved;
+  if (challenge) {
+    const current = challenge.index + 1;
+    const total = challenge.questions.length;
+    $('round').textContent = current + ' / ' + total + '問 · 正解 ' + challenge.correct;
+    $('advance').textContent = current === total ? 'もう一度挑戦' : '次の問題 →';
+  }
   for (const id of ['lower', 'higher', 'preview', 'submit']) $(id).disabled = !unlocked || solved;
   if (unlocked && !solved) {
     $('lower').disabled = pitch === minPitch;
@@ -105,7 +134,8 @@ function updateControls() {
 function reset(sameSong) {
   stop();
   const previous = sameSong ? gapIndex : -1;
-  song = songs[Number(songPicker.value)];
+  const question = challenge?.questions[challenge.index];
+  song = songs[question?.songIndex ?? Number(songPicker.value)];
   duration = 0;
   score = song.score.map(([pitch, beats]) => {
     const note = { pitch, beats, beat: duration };
@@ -113,7 +143,7 @@ function reset(sameSong) {
     return note;
   });
   const candidates = score.map((_, index) => index).slice(2, -2).filter(index => index !== previous);
-  gapIndex = candidates[Math.floor(Math.random() * candidates.length)];
+  gapIndex = question?.gap ?? candidates[Math.floor(Math.random() * candidates.length)];
   pitch = 60;
   chosen = false;
   solved = false;
@@ -124,10 +154,11 @@ function reset(sameSong) {
   seek.max = duration;
   seek.step = 'any';
   $('pitch').textContent = namePitch(pitch);
+  $('track-title').textContent = song.name;
   $('source').href = song.source;
   notes.replaceChildren(...score.map((note, index) => drawNote(note, index)));
   setPosition(-lead);
-  status.textContent = '最初は抜けた音だけ無音で、曲が最後まで流れます。';
+  status.textContent = '抜けた音だけ無音で再生します。';
   updateControls();
 }
 
@@ -141,17 +172,19 @@ function stop() {
   updateControls();
 }
 
-async function playSong() {
-  if (playback) {
-    stop();
-    status.textContent = '楽譜を横に動かして聴き直せます。';
-    return;
-  }
+function playbackPosition() {
+  if (!playback) return position;
+  const { startBeat, startTime, beatLength } = playback;
+  return startBeat + Math.max(0, audio.currentTime - startTime) / beatLength;
+}
+
+async function playSong(startBeat) {
+  stop();
   const request = ++audioRequest;
   try {
     audio = await startAudio();
   } catch {
-    if (request === audioRequest) status.textContent = '音声を開始できませんでした。もう一度「曲を聴く」を押してください。';
+    if (request === audioRequest) status.textContent = '音声を開始できませんでした。再生ボタンをもう一度押してください。';
     return;
   }
   if (request !== audioRequest) return;
@@ -162,24 +195,27 @@ async function playSong() {
     output.connect(audio.destination);
   }
 
-  const start = audio.currentTime + .045;
-  const beatLength = 60 / song.bpm;
+  const startTime = audio.currentTime + .045;
+  const beatLength = 60 / (song.bpm * Number(speedPicker.value));
+  const voice = currentVoice();
   const bus = audio.createGain();
   bus.connect(output);
   const cancelTones = [];
   score.forEach((note, index) => {
-    if (index === gapIndex && !solved) return;
-    cancelTones.push(playTone(audio, bus, song.voice, note.pitch,
-      start + (note.beat + lead) * beatLength, note.beats * beatLength * .96));
+    const onset = Math.max(note.beat, startBeat);
+    const remaining = (note.beat + note.beats - onset) * beatLength;
+    if (remaining < .004 || (index === gapIndex && !solved)) return;
+    cancelTones.push(playTone(audio, bus, voice, note.pitch,
+      startTime + (onset - startBeat) * beatLength, remaining * .96));
   });
-  playback = { bus, cancelTones, frame: 0 };
+  playback = { bus, cancelTones, startBeat, startTime, beatLength, frame: 0 };
   unlocked = true;
-  status.textContent = song.instrument + 'で再生中';
-  setPosition(-lead);
+  status.textContent = voiceNames[voice] + 'で再生中 · ' + speedPicker.value + '倍';
+  setPosition(startBeat);
   updateControls();
 
   function tick() {
-    const beat = (audio.currentTime - start) / beatLength - lead;
+    const beat = playbackPosition();
     setPosition(beat);
     if (beat < duration + .2) {
       playback.frame = requestAnimationFrame(tick);
@@ -195,18 +231,18 @@ async function playSong() {
 
 function previewPitch(value, delay = 0) {
   if (audio?.state === 'running') {
-    playTone(audio, output, song.voice, value, audio.currentTime + delay, .2, .12);
+    playTone(audio, output, currentVoice(), value, audio.currentTime + delay, .2, .12);
   }
 }
 
 function scrub(target) {
-  if (!unlocked) return;
+  const previous = playbackPosition();
   stop();
   const next = clamp(target, -lead, duration);
-  const forward = next >= position;
+  const forward = next >= previous;
   const crossed = score.filter(note => forward
-    ? position < note.beat && note.beat <= next
-    : next <= note.beat && note.beat < position);
+    ? previous < note.beat && note.beat <= next
+    : next <= note.beat && note.beat < previous);
   if (!forward) crossed.reverse();
   let delay = 0;
   for (const note of crossed) {
@@ -219,7 +255,8 @@ function scrub(target) {
 
 function stepNote(direction) {
   const list = direction > 0 ? score : [...score].reverse();
-  const note = list.find(note => (note.beat - position) * direction > .001);
+  const beat = playbackPosition();
+  const note = list.find(note => (note.beat - beat) * direction > .001);
   scrub(note?.beat ?? (direction > 0 ? duration : -lead));
 }
 
@@ -245,20 +282,54 @@ function submitAnswer() {
   if (!unlocked || solved) return;
   const answer = score[gapIndex];
   stop();
-  solved = pitch === answer.pitch;
+  const correct = pitch === answer.pitch;
+  solved = correct || Boolean(challenge);
+  const submitted = pitch;
+  if (challenge && correct) challenge.correct += 1;
+  if (solved) pitch = answer.pitch;
   chosen = true;
+  $('pitch').textContent = namePitch(pitch);
   drawNote(answer, gapIndex, notes.children[gapIndex]);
   if (solved) {
     setPosition(answer.beat);
     previewPitch(pitch);
-    status.textContent = '正解！ 抜けていた音は ' + namePitch(pitch) + ' です。';
+    const answerText = '抜けていた音は ' + namePitch(pitch) + ' です。';
+    status.textContent = (correct ? '正解！ ' : namePitch(submitted) + ' は不正解。') + answerText;
+    if (challenge && challenge.index === challenge.questions.length - 1) {
+      status.textContent += ' 結果は ' + challenge.questions.length + '問中 ' + challenge.correct + '問正解です。';
+    }
   } else {
     status.textContent = namePitch(pitch) + ' は違うようです。曲を聴き直して、別の音を試してください。';
   }
   updateControls();
 }
 
-play.addEventListener('click', playSong);
+play.addEventListener('click', () => playSong(-lead));
+$('resume').addEventListener('click', () => playSong(playbackPosition()));
+$('stop').addEventListener('click', () => {
+  const beat = playbackPosition();
+  stop();
+  setPosition(beat);
+  status.textContent = '再生を停止しました。';
+});
+for (const picker of [voicePicker, speedPicker]) {
+  picker.addEventListener('change', () => {
+    const beat = playbackPosition();
+    if (playback && beat < duration) playSong(beat);
+  });
+}
+function changeMode() {
+  challenge = modePicker.value === 'random' ? makeChallenge() : undefined;
+  reset(false);
+}
+
+modePicker.addEventListener('change', changeMode);
+$('advance').addEventListener('click', () => {
+  if (!challenge || !solved) return;
+  if (challenge.index + 1 === challenge.questions.length) challenge = makeChallenge();
+  else challenge.index += 1;
+  reset(false);
+});
 songPicker.addEventListener('change', () => reset(false));
 $('reset').addEventListener('click', () => reset(true));
 $('previous').addEventListener('click', () => stepNote(-1));
@@ -273,13 +344,15 @@ $('preview').addEventListener('click', () => {
 $('submit').addEventListener('click', submitAnswer);
 
 sheet.addEventListener('wheel', event => {
-  if (!unlocked || event.ctrlKey || event.metaKey) return;
-  event.preventDefault();
+  if (event.ctrlKey || event.metaKey) return;
   const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? sheet.clientWidth : 1;
   if (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-    scrub(position + (event.deltaX || event.deltaY) * scale / beatWidth);
+    event.preventDefault();
+    scrub(playbackPosition() + (event.deltaX || event.deltaY) * scale / beatWidth);
     return;
   }
+  if (!unlocked || solved) return;
+  event.preventDefault();
   wheelPitch -= event.deltaY * scale / 40;
   const steps = Math.trunc(wheelPitch);
   if (steps) {
@@ -289,10 +362,10 @@ sheet.addEventListener('wheel', event => {
 }, { passive: false });
 
 sheet.addEventListener('pointerdown', event => {
-  if (!unlocked || !event.isPrimary || event.button !== 0) return;
+  if (!event.isPrimary || event.button !== 0) return;
   sheet.focus({ preventScroll: true });
   sheet.setPointerCapture(event.pointerId);
-  gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, position, axis: '', steps: 0 };
+  gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, position: playbackPosition(), axis: '', steps: 0 };
 });
 
 sheet.addEventListener('pointermove', event => {
@@ -316,7 +389,6 @@ sheet.addEventListener('pointermove', event => {
 
 sheet.addEventListener('lostpointercapture', () => { gesture = undefined; });
 sheet.addEventListener('keydown', event => {
-  if (!unlocked) return;
   const actions = {
     ArrowLeft: () => stepNote(-1),
     ArrowRight: () => stepNote(1),
@@ -330,4 +402,4 @@ sheet.addEventListener('keydown', event => {
   action();
 });
 
-reset(false);
+changeMode();

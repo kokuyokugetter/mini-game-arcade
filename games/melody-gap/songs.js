@@ -17,12 +17,12 @@ const sakura = [
 
 export const songs = [
   {
-    name: 'きらきら星', bpm: 100, voice: 'piano', instrument: 'ピアノ風',
+    name: 'きらきら星', bpm: 100, voice: 'piano',
     source: 'https://imslp.org/wiki/Ah%21_vous_diraije%2C_Maman_%28Mozart%2C_Wolfgang_Amadeus%29',
     score: [...twinkle, ...twinkleMiddle, ...twinkleMiddle, ...twinkle],
   },
   {
-    name: '歓喜の歌', bpm: 80, voice: 'strings', instrument: '弦楽器風',
+    name: '歓喜の歌', bpm: 80, voice: 'strings',
     source: 'https://imslp.org/wiki/Symphony_No.9_-_An_die_Freude_%28Beethoven%2C_Ludwig_van%29',
     score: [
       ...joy, [66, 1.5], [64, .5], [64, 2],
@@ -33,7 +33,7 @@ export const songs = [
     ],
   },
   {
-    name: 'さくらさくら', bpm: 86, voice: 'koto', instrument: '箏風',
+    name: 'さくらさくら', bpm: 86, voice: 'koto',
     source: 'https://www.jstage.jst.go.jp/article/jjomer/32/2/32_1/_article/-char/ja',
     score: [...sakura, ...sakura.slice(6, 14), [64, 1], [60, 1], [64, 1], [65, 1], [64, 3]],
   },

@@ -2,6 +2,7 @@
 
 const ROUND_COUNT = 5;
 const RADIUS = 5;
+const BROWSE_RADIUS = 16;
 const formatter = new Intl.NumberFormat("ja-JP");
 const ui = Object.fromEntries(
   Array.from(document.querySelectorAll("[id]"), element => [element.id, element])
@@ -11,6 +12,16 @@ let rounds;
 let roundIndex;
 let total;
 let answered;
+let dragStart;
+
+function centerTarget() {
+  const target = ui.digits.querySelector(".target");
+  ui.viewport.scrollLeft = target.offsetLeft + target.offsetWidth / 2 - ui.viewport.clientWidth / 2;
+}
+
+function moveDigits(direction) {
+  ui.viewport.scrollBy({ left: direction * ui.viewport.clientWidth * 0.65 });
+}
 
 function segmentAt(position) {
   const start = Math.max(1, position - RADIUS);
@@ -38,9 +49,10 @@ function featureAt(position) {
 function chooseRounds(size) {
   const band = size / ROUND_COUNT;
   const questions = Array.from({ length: ROUND_COUNT }, (_, index) => {
-    // 各区間の端を空け、別の問題で同じ断片が繰り返し出るのを防ぐ。
-    const start = index * band + RADIUS + 1;
-    const candidates = Array.from({ length: band - 2 * RADIUS }, (_, offset) => {
+    // 桁列の端が見えて正解を特定できないよう、出題位置を内側に取る。
+    const start = Math.max(index * band + 1, BROWSE_RADIUS + 2);
+    const end = Math.min((index + 1) * band, PI_DIGITS.length - BROWSE_RADIUS - 1);
+    const candidates = Array.from({ length: end - start + 1 }, (_, offset) => {
       const position = start + offset;
       return { position, ...featureAt(position) };
     });
@@ -57,17 +69,14 @@ function chooseRounds(size) {
 
 function renderRound() {
   const { position, label } = rounds[roundIndex];
-  const cells = Array.from({ length: 2 * RADIUS + 1 }, (_, index) => {
-    const offset = index - RADIUS;
+  const cells = Array.from({ length: 2 * BROWSE_RADIUS + 1 }, (_, index) => {
+    const offset = index - BROWSE_RADIUS;
     const digit = PI_DIGITS[position + offset - 1];
     const cell = document.createElement("span");
-    cell.textContent = digit ?? "·";
+    cell.textContent = digit;
     if (offset === 0) {
       cell.className = "target";
       cell.setAttribute("aria-label", `予想する数字 ${digit}`);
-    } else if (!digit) {
-      cell.className = "empty";
-      cell.setAttribute("aria-hidden", "true");
     }
     return cell;
   });
@@ -76,6 +85,7 @@ function renderRound() {
   const hintEnd = hintStart + hintBand - 1;
   answered = false;
   ui.digits.replaceChildren(...cells);
+  centerTarget();
   ui.feature.textContent = label;
   ui.landmarks.textContent = `${formatter.format(hintStart)}〜${formatter.format(hintEnd)}桁目の間。先頭の10桁は 1415926535。`;
   ui.landmarks.parentElement.open = false;
@@ -104,6 +114,29 @@ function startGame() {
 function score(distance, size) {
   return Math.round(1000 * Math.max(0, 1 - distance / (size - 1)) ** 5);
 }
+
+ui.center.addEventListener("click", centerTarget);
+ui["previous-digits"].addEventListener("click", () => moveDigits(-1));
+ui["next-digits"].addEventListener("click", () => moveDigits(1));
+ui.viewport.addEventListener("keydown", event => {
+  const direction = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+  if (!direction) return;
+  event.preventDefault();
+  moveDigits(direction);
+});
+ui.viewport.addEventListener("pointerdown", event => {
+  if (event.pointerType !== "mouse" || event.button !== 0 || event.target === ui.viewport) return;
+  dragStart = { left: ui.viewport.scrollLeft, x: event.clientX };
+  ui.viewport.setPointerCapture(event.pointerId);
+  ui.viewport.classList.add("dragging");
+});
+ui.viewport.addEventListener("pointermove", event => {
+  if (dragStart) ui.viewport.scrollLeft = dragStart.left + dragStart.x - event.clientX;
+});
+ui.viewport.addEventListener("lostpointercapture", () => {
+  dragStart = undefined;
+  ui.viewport.classList.remove("dragging");
+});
 
 ui.position.addEventListener("input", () => {
   ui.guess.value = ui.position.value;

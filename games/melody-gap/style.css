@@ -46,24 +46,33 @@ header p, .help { color: var(--text-quiet); }
   box-shadow: 0 12px 28px #4a321312;
 }
 
-.toolbar, .transport, .answer, footer {
+.transport, .playback, .answer, footer {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.toolbar, .answer, footer {
+.answer, footer {
   justify-content: space-between;
   flex-wrap: wrap;
 }
 
+.toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 8px 12px;
+}
+
 .toolbar label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: .84rem;
   color: var(--text-quiet);
 }
+
+.toolbar select { min-width: 0; font-size: .95rem; }
+.toolbar [hidden] { display: none; }
 
 button, select {
   min-height: 44px;
@@ -82,12 +91,24 @@ button.primary { background: var(--red); border-color: var(--red); color: white;
 button.primary:enabled:hover { background: #832a23; }
 :focus-visible { outline: 3px solid #58757b; outline-offset: 3px; }
 
+.track {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.track h2 { margin: 0; font-size: 1.25rem; }
+#round { color: var(--red); font-size: .86rem; font-weight: 700; }
+
 .sheet {
   position: relative;
   overflow: hidden;
   isolation: isolate;
   height: 190px;
-  margin: 16px 0 8px;
+  margin: 8px 0;
   background: #fbf4e3;
   border: 1px solid var(--edge);
   border-radius: 10px;
@@ -198,9 +219,12 @@ button.primary:enabled:hover { background: #832a23; }
 
 .transport input { flex: 1; min-width: 0; accent-color: var(--red); }
 .transport button { min-width: 44px; }
-.seek-label, .help, footer { font-size: .84rem; }
+.help, footer { font-size: .84rem; }
 
-.help { margin: 8px 0 18px; }
+.playback { flex-wrap: wrap; margin-top: 8px; }
+.playback button { flex: 1 1 auto; }
+.help { margin: 10px 0 16px; }
+.answer { border-top: 1px solid var(--edge); padding-top: 14px; }
 .pitch { display: flex; gap: 4px; }
 .pitch button { min-width: 44px; }
 #preview { min-width: 75px; }
@@ -210,5 +234,5 @@ button.primary:enabled:hover { background: #832a23; }
 
 @media (max-width: 370px) {
   main { width: calc(100% - 20px); }
-  .answer button { padding-inline: 8px; }
+  .playback button, .answer button, .toolbar select { padding-inline: 8px; }
 }

@@ -3,55 +3,64 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>円周率ゲッサー | ゲッタ〜クソゲーの墓場</title>
-  <link rel="stylesheet" href="style.css">
+  <title>pi guesser | ゲッタ〜クソゲーの墓場</title>
+  <link rel="stylesheet" href="style.css?v=2">
   <script defer src="pi-digits.js"></script>
-  <script defer src="game.js"></script>
+  <script defer src="game.js?v=2"></script>
 </head>
 <body>
   <main>
-    <header>
-      <a class="back" href="../../index.html">← ゲーム一覧</a>
-      <span class="mark" aria-hidden="true">π</span>
+    <nav aria-label="ゲーム一覧"><a href="../../index.html">← ゲーム一覧</a></nav>
+    <header class="masthead">
+      <h1>pi guesser</h1>
+      <p>円周率の数字列を左右に動かし、枠で囲んだ数字が小数点以下の何桁目か当てよう。3.<strong>1</strong>4159…の「1」が1桁目。</p>
     </header>
-    <h1>円周率ゲッサー</h1>
-    <p class="intro">円周率の一部を見て、<strong>枠で囲んだ数字</strong>が小数点以下の何桁目か当てよう。3.<strong>1</strong>4159…の「1」が1桁目。</p>
     <section class="console" aria-label="ゲーム">
       <div class="toolbar">
-        <label for="difficulty">探索範囲
+        <p id="progress"></p>
+        <label for="difficulty">出題範囲
           <select id="difficulty">
             <option value="100">1〜100桁</option>
             <option value="1000">1〜1,000桁</option>
             <option value="10000">1〜10,000桁</option>
           </select>
         </label>
-        <p id="progress"></p>
       </div>
-      <div class="viewport">
-        <p class="strip-label">現在地の断片 ・ 中央の枠が出題地点</p>
-        <span class="compass" aria-hidden="true">▲ N</span>
-        <div id="digits" class="digits"></div>
-        <p id="feature" class="feature"></p>
-      </div>
+      <section class="observation" aria-labelledby="strip-label">
+        <div class="observation-header">
+          <h2 id="strip-label">円周率の断片</h2>
+          <button id="center" class="subtle" type="button">出題位置に戻る</button>
+        </div>
+        <div id="viewport" class="viewport" tabindex="0" aria-label="円周率の数字列。左右の矢印キーで移動" aria-describedby="feature">
+          <div id="digits" class="digits"></div>
+        </div>
+        <div class="observation-footer">
+          <p id="feature"></p>
+          <div class="pan-actions">
+            <button id="previous-digits" class="subtle" type="button" aria-label="数字列を左に動かす">←</button>
+            <button id="next-digits" class="subtle" type="button" aria-label="数字列を右に動かす">→</button>
+          </div>
+        </div>
+      </section>
       <form id="guess-form">
         <div class="scale">
-          <label for="position">桁マップ</label>
+          <label for="position">予想位置</label>
           <input id="position" type="range" min="1" value="50" aria-describedby="range-description">
           <div id="range-description" class="scale-labels"><span>1桁目</span><span id="range-end"></span></div>
-          <div id="map-result" class="map-result" aria-hidden="true" hidden>
-            <div class="route-line"><span class="guess-pin"></span><span class="answer-pin"></span></div>
-            <div class="pin-legend"><span>予想</span><span>正解</span></div>
-          </div>
         </div>
         <div class="actions">
           <label for="guess">予想する桁
             <input id="guess" type="number" min="1" step="1" inputmode="numeric" required>
           </label>
-          <button id="submit" type="submit">ここだ！</button>
+          <button id="submit" type="submit">予想を確定</button>
           <button id="next" type="button" hidden>次の問題</button>
         </div>
       </form>
       <p id="result" class="result" role="status"></p>
+      <div id="map-result" class="comparison" aria-hidden="true" hidden>
+        <div class="comparison-track"><i></i><i></i></div>
+        <div class="comparison-labels"><span>予想</span><span>正解</span></div>
+      </div>
       <details>
         <summary>手がかりを見る</summary>
         <p id="landmarks"></p>

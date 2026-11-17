@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f0df">
   <title>虫食いメロディー | ゲッタ〜クソゲーの墓場</title>
-  <link rel="stylesheet" href="style.css">
-  <script type="module" src="game.js"></script>
+  <link rel="stylesheet" href="style.css?v=2">
+  <script type="module" src="game.js?v=2"></script>
 </head>
 <body>
   <main>
@@ -18,10 +18,33 @@
 
     <section class="instrument" aria-label="虫食いメロディーの操作">
       <div class="toolbar">
-        <label for="song">曲を選ぶ
+        <label>モード
+          <select id="mode">
+            <option value="single">曲を選ぶ</option>
+            <option value="random">ランダム10問</option>
+          </select>
+        </label>
+        <label id="song-field">曲
           <select id="song"></select>
         </label>
-        <button id="play" class="primary">▶ 曲を聴く</button>
+        <label>音色
+          <select id="voice">
+            <option value="auto">曲に合わせる</option>
+          </select>
+        </label>
+        <label>速度
+          <select id="speed">
+            <option value="0.75">0.75倍</option>
+            <option value="1" selected>1倍</option>
+            <option value="1.25">1.25倍</option>
+            <option value="1.5">1.5倍</option>
+            <option value="2">2倍</option>
+          </select>
+        </label>
+      </div>
+      <div class="track">
+        <h2 id="track-title"></h2>
+        <span id="round" hidden></span>
       </div>
 
       <div class="sheet" id="sheet" tabindex="0" role="group" aria-label="楽譜" aria-describedby="sheet-help">
@@ -31,11 +54,15 @@
       </div>
       <div class="transport">
         <button id="previous" aria-label="前の音へ">←</button>
-        <label class="seek-label" for="seek">再生位置</label>
         <input id="seek" type="range" value="0" aria-label="再生位置">
         <button id="next" aria-label="次の音へ">→</button>
       </div>
-      <p class="help" id="sheet-help">横に動かすと、赤線を通る音が鳴ります。縦に動かすと、答えの音程が変わります。</p>
+      <div class="playback">
+        <button id="play" class="primary">▶ 最初から</button>
+        <button id="resume">▶ 再生位置から</button>
+        <button id="stop" aria-label="再生を停止">■ 停止</button>
+      </div>
+      <p class="help" id="sheet-help">楽譜を横に動かすと赤線を通る音が鳴り、縦に動かすと答えの音程が変わります。</p>
 
       <div class="answer">
         <div class="pitch">
@@ -45,9 +72,10 @@
         </div>
         <button id="submit" class="primary">この音で答える</button>
       </div>
-      <p id="status" role="status">最初は抜けた音だけ無音で、曲が最後まで流れます。</p>
+      <p id="status" role="status">抜けた音だけ無音で再生します。</p>
       <footer>
         <button id="reset" class="quiet">同じ曲で別の問題</button>
+        <button id="advance" class="primary" hidden>次の問題 →</button>
         <a id="source" target="_blank" rel="noopener">楽曲資料 ↗</a>
       </footer>
     </section>

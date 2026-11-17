@@ -3,54 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#eee7da">
+  <meta name="theme-color" content="#f7f3eb">
   <title>ろくろアート | ゲッタ〜クソゲーの墓場</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="game.js" defer></script>
+  <link rel="stylesheet" href="style.css?v=2">
+  <script src="game.js?v=2" defer></script>
 </head>
 <body>
   <main class="studio">
     <header>
       <a class="back" href="../../">← ゲーム一覧</a>
       <h1>ろくろアート</h1>
-      <p>回る粘土から、ひとつの器を。</p>
+      <p>回る円盤にペンを当てて、輪や渦を描こう。</p>
     </header>
     <div class="layout">
-      <section class="stage" aria-label="ろくろ">
-        <canvas id="wheel" tabindex="0" aria-label="成形する粘土" aria-describedby="instructions">
+      <section class="stage" aria-label="作業台">
+        <canvas id="wheel" tabindex="0" aria-label="描画する円盤" aria-describedby="instructions keys">
           このゲームには Canvas 対応ブラウザーが必要です。
         </canvas>
-        <span class="stage-label" id="stage-label">成形中</span>
-        <button class="spin" id="spin" type="button" aria-pressed="true">回転中</button>
+        <button class="spin" id="spin" type="button" aria-pressed="true">⏸ 回転を止める</button>
       </section>
-
-      <section class="panel" aria-label="工房の道具">
+      <section class="panel" aria-label="描画の設定">
         <div>
-          <h2>形をつくる</h2>
-          <p id="instructions">粘土を横にドラッグして、膨らみやくびれをつくります。キー操作では上下で位置を、左右で太さを変えられます。</p>
-          <div class="presets" aria-label="粘土の初期形状">
-            <button type="button" data-form="cylinder" aria-pressed="true">筒</button>
-            <button type="button" data-form="bowl" aria-pressed="false">鉢</button>
-            <button type="button" data-form="vase" aria-pressed="false">花器</button>
+          <h2>マーカー</h2>
+          <div class="swatches" aria-label="インクの色">
+            <button type="button" data-ink="#d7353d" style="--swatch:#d7353d" aria-pressed="true">赤</button>
+            <button type="button" data-ink="#214fbd" style="--swatch:#214fbd" aria-pressed="false">青</button>
+            <button type="button" data-ink="#218157" style="--swatch:#218157" aria-pressed="false">緑</button>
+            <button type="button" data-ink="#272324" style="--swatch:#272324" aria-pressed="false">黒</button>
           </div>
         </div>
-        <div class="glazes">
-          <h2>色を選ぶ</h2>
-          <div class="swatches" aria-label="仕上げの色">
-            <button type="button" data-glaze="clay" style="--swatch:#ad6850" aria-pressed="true" aria-label="素焼き"></button>
-            <button type="button" data-glaze="ivory" style="--swatch:#e3d4a9" aria-pressed="false" aria-label="生成り"></button>
-            <button type="button" data-glaze="moss" style="--swatch:#71816a" aria-pressed="false" aria-label="苔色"></button>
-            <button type="button" data-glaze="indigo" style="--swatch:#4b6582" aria-pressed="false" aria-label="藍色"></button>
-            <button type="button" data-glaze="plum" style="--swatch:#92556b" aria-pressed="false" aria-label="梅色"></button>
-          </div>
-          <p id="glaze-name" aria-live="polite">素焼き</p>
+        <div class="control">
+          <label for="width">線の太さ</label><output id="width-value" for="width">4</output>
+          <input type="range" id="width" min="2" max="14" value="4">
+        </div>
+        <div class="control">
+          <label for="speed">回転の速さ</label><output id="speed-value" for="speed">36 rpm</output>
+          <input type="range" id="speed" min="8" max="90" value="36">
+        </div>
+        <div class="control">
+          <label for="repeat">模様の繰り返し</label>
+          <select id="repeat">
+            <option value="1">なし</option>
+            <option value="2">2方向</option>
+            <option value="3">3方向</option>
+            <option value="4">4方向</option>
+            <option value="6">6方向</option>
+            <option value="8">8方向</option>
+          </select>
         </div>
         <div class="actions">
           <button type="button" id="undo" disabled>元に戻す</button>
-          <button type="button" id="reset" disabled>形をリセット</button>
+          <button type="button" id="clear" disabled>全部消す</button>
         </div>
-        <button type="button" id="finish">仕上げる</button>
-        <p class="status" id="status" role="status"></p>
+        <button type="button" id="save" disabled>画像を保存</button>
+        <details>
+          <summary>描き方</summary>
+          <p id="instructions">同じ場所を押し続けると円に、中心へ動かすと渦になります。回転を止めると、好きな形を描けます。</p>
+          <p id="keys">キー操作では、矢印でペンを動かし、スペースでペンを出し入れできます。</p>
+        </details>
+        <p class="sr-only" id="status" role="status"></p>
       </section>
     </div>
   </main>
