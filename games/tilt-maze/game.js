@@ -50,11 +50,13 @@ const mazes = {
 };
 
 const instructions = {
-  spiral: '外側から渦巻きをたどり、中心の穴を目指します。',
-  twin: '同じ傾きで2球が動きます。AとBを、それぞれ同じ記号の穴へ。',
-  swap: '同じ傾きで2球が動きます。壁を使って、AとBの出発位置を入れ替えます。',
+  spiral: '渦巻きの途中で ① → ② を通り、中心の穴を目指します。',
+  twin: 'AとBを、それぞれ同じ記号のゴールに同時に入れます。',
+  swap: 'AとBを互いの出発位置に同時に入れます。',
   gates: '① → ② → ③ の順に球を通すと、ゴールの穴が開きます。',
-  slider: '左右に傾けると壁もレールを滑ります。壁をよけてから球を通します。',
+  slider: '左右に傾けて2枚の壁をずらし、球が通れる隙間を作ります。',
+  electric: '光る電流壁に触れると失敗。通路の中央を進みます。',
+  water: '水をこぼさず皿をゴールへ。小さく傾けるか、指を少しだけずらします。矢印キーは Shift で弱く操作できます。',
 };
 const ballColors = [
   { rim: '#286d64', mid: '#8ed5bc', dark: '#204e48', light: '#f6fff5' },
@@ -73,6 +75,7 @@ const objective = document.querySelector('#objective');
 const bestLabel = document.querySelector('#best');
 const win = document.querySelector('#win');
 const next = document.querySelector('#next');
+const fail = document.querySelector('#fail');
 const keys = new Set();
 const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 const radius = .29;
@@ -85,7 +88,9 @@ let maze;
 let balls = [];
 let checkpoints;
 let checkpointIndex;
-let slider;
+let sliders;
+let water;
+let shift = false;
 let elapsed;
 let best;
 let state;
@@ -103,7 +108,7 @@ function say(text) {
 
 function stopMomentum() {
   for (const ball of balls) ball.vx = ball.vy = 0;
-  if (slider) slider.vx = 0;
+  for (const slider of sliders) slider.vx = 0;
 }
 
 function gravity(beta, gamma, angle) {
@@ -195,7 +200,7 @@ function updateObjective() {
   if (checkpoints.length) {
     objective.textContent = `${message} 通過 ${checkpointIndex}/${checkpoints.length}`;
   } else if (balls.length > 1) {
-    objective.textContent = `${message} 到着 ${balls.filter(ball => ball.done).length}/${balls.length}`;
+    objective.textContent = `${message} 到着 ${balls.filter(ball => atGoal(ball)).length}/${balls.length}`;
   } else {
     objective.textContent = message;
   }
@@ -236,22 +241,28 @@ function drawBackdrop() {
   }
   for (const [y, row] of maze.entries()) {
     for (let x = 0; x < row.length; x++) {
-      if (row[x] !== '#') continue;
+      if (row[x] !== '#' && row[x] !== 'X') continue;
       paint.fillStyle = '#78543880';
       paint.fillRect(x * unit + 3, y * unit + 5, unit, unit);
     }
   }
   for (const [y, row] of maze.entries()) {
     for (let x = 0; x < row.length; x++) {
-      if (row[x] !== '#') continue;
-      paint.fillStyle = (x + y) % 2 ? '#486258' : '#506a5d';
+      if (row[x] !== '#' && row[x] !== 'X') continue;
+      const live = row[x] === 'X';
+      paint.fillStyle = live ? '#61362f' : (x + y) % 2 ? '#486258' : '#506a5d';
       paint.fillRect(x * unit, y * unit, unit, unit);
+      if (live) {
+        marker(paint, (x + .5) * unit, (y + .5) * unit, 'ϟ', '#ffc357');
+        paint.fillStyle = '#f19d48';
+        paint.fillRect(x * unit + 3, y * unit + unit - 6, unit - 6, 3);
+      }
       paint.fillStyle = '#a9c0aa66';
       paint.fillRect(x * unit, y * unit, unit, 2);
     }
   }
 
-  if (slider) {
+  for (const slider of sliders) {
     paint.fillStyle = '#705436';
     for (const offset of [-.32, .32]) {
       paint.fillRect((slider.min - .43) * unit, (slider.y + offset) * unit, (slider.max - slider.min + .86) * unit, 3);
@@ -270,9 +281,9 @@ function drawBackdrop() {
     paint.setLineDash([]);
     const x = goal.x * unit, y = goal.y * unit;
     const locked = checkpointIndex < checkpoints.length;
-    disc(paint, x, y, 17, locked ? '#7b592c' : '#182a26', balls.length > 1 ? colors.rim : '#fff2b6');
-    if (balls.length > 1 || locked || ball.done) {
-      marker(paint, x, y, ball.done ? '✓' : locked ? '×' : ball.label, colors.light);
+    disc(paint, x, y, 17, locked ? '#7b592c' : atGoal(ball) ? colors.dark : '#182a26', balls.length > 1 ? colors.rim : '#fff2b6');
+    if (balls.length > 1 || locked) {
+      marker(paint, x, y, locked ? '×' : ball.label, colors.light);
     } else {
       disc(paint, x, y, 3.4, '#fff2b6');
     }
@@ -285,31 +296,32 @@ function reset() {
   const goals = level.value === 'swap' ? [starts[1], starts[0]] : ['G', 'H'].map(locationOf);
   balls = starts.map((start, index) => ({
     ...start, start, vx: 0, vy: 0, goal: goals[index], label: index === 0 ? 'A' : 'B',
-    colors: ballColors[index], done: false,
+    colors: ballColors[index],
   }));
   checkpoints = ['1', '2', '3'].map(locationOf).filter(Boolean);
   checkpointIndex = 0;
-  const railStart = locationOf('M');
-  slider = null;
-  if (railStart) {
+  sliders = ['M', 'N'].map(locationOf).filter(Boolean).map(railStart => {
     const rail = maze[Math.floor(railStart.y)];
     let min = Math.floor(railStart.x), max = min;
     while (rail[min - 1] === '=') min -= 1;
     while (rail[max + 1] === '=') max += 1;
-    slider = { ...railStart, min: min + .5, max: max + .5, vx: 0 };
-  }
+    return { ...railStart, min: min + .5, max: max + .5, vx: 0 };
+  });
+  water = level.value === 'water' ? { x: 0, y: 0, vx: 0, vy: 0, spilled: false } : null;
   keys.clear();
   pointer = undefined;
   elapsed = 0;
   state = 'ready';
   clock.textContent = seconds(0);
   win.hidden = true;
+  fail.hidden = true;
+  shift = false;
   next.hidden = level.selectedIndex === level.options.length - 1;
   canvas.width = maze[0].length * unit;
   canvas.height = maze.length * unit;
   best = null;
   try {
-    const stored = Number(localStorage.getItem(`tilt-maze-best-${level.value}`));
+    const stored = Number(localStorage.getItem(recordKey()));
     if (stored > 0 && Number.isFinite(stored)) best = stored;
   } catch {}
   updateBest();
@@ -317,6 +329,11 @@ function reset() {
   say(motionState === 'on' ? 'スマホを傾けるとスタートします。' : '「傾き操作を使う」を押すか、指や矢印キーでスタート。');
   drawBackdrop();
   paint();
+}
+
+function recordKey() {
+  const suffix = Object.hasOwn(challenges, level.value) ? '-v3' : '';
+  return `tilt-maze-best-${level.value}${suffix}`;
 }
 
 function updateBest() {
@@ -327,11 +344,11 @@ function inputVector() {
   let x = Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'));
   let y = Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'));
   if (x || y) {
-    const scale = Math.hypot(x, y);
+    const scale = Math.hypot(x, y) / (shift ? .37 : 1);
     return { x: x / scale, y: y / scale };
   }
   if (pointer) {
-    const reference = balls.length > 1 ? pointer.start : balls[0];
+    const reference = balls.length > 1 || water ? pointer.start : balls[0];
     x = (pointer.x - reference.x) / 1.6;
     y = (pointer.y - reference.y) / 1.6;
   } else if (motionState === 'on' && neutral && sample.angle === neutral.angle) {
@@ -344,27 +361,26 @@ function inputVector() {
   return { x: x / scale, y: y / scale };
 }
 
-function fits(x, y) {
+function wallAt(x, y, electricOnly = false) {
   for (let row = Math.floor(y - radius); row <= Math.floor(y + radius); row++) {
     for (let col = Math.floor(x - radius); col <= Math.floor(x + radius); col++) {
       const tile = maze[row]?.[col];
-      if (tile && tile !== '#') continue;
+      if (electricOnly ? tile !== 'X' : tile && tile !== '#' && tile !== 'X') continue;
       const dx = x - clamp(x, col, col + 1);
       const dy = y - clamp(y, row, row + 1);
-      if (dx * dx + dy * dy < radius * radius) return false;
+      if (dx * dx + dy * dy < radius * radius) return true;
     }
   }
-  return true;
+  return false;
 }
 
-function touchesSlider(x, y, wallX) {
+function touchesSlider(slider, x, y, wallX = slider.x) {
   const dx = x - clamp(x, wallX - .46, wallX + .46);
   const dy = y - clamp(y, slider.y - .44, slider.y + .44);
   return dx * dx + dy * dy < radius * radius;
 }
 
-function moveSlider(input, dt) {
-  if (!slider) return false;
+function moveSlider(slider, input, dt) {
   slider.vx = clamp((slider.vx + input * 33 * dt) * Math.exp(-4 * dt), -7.2, 7.2);
   const x = clamp(slider.x + slider.vx * dt, slider.min, slider.max);
   const delta = x - slider.x;
@@ -373,8 +389,8 @@ function moveSlider(input, dt) {
     return false;
   }
   const ball = balls[0];
-  if (!ball.done && touchesSlider(ball.x, ball.y, x)) {
-    if (!fits(ball.x + delta, ball.y)) {
+  if (touchesSlider(slider, ball.x, ball.y, x)) {
+    if (wallAt(ball.x + delta, ball.y)) {
       slider.vx = 0;
       return false;
     }
@@ -386,60 +402,96 @@ function moveSlider(input, dt) {
 }
 
 function fitsBall(ball, x, y) {
-  if (!fits(x, y) || slider && touchesSlider(x, y, slider.x)) return false;
-  return !balls.some(other => other !== ball && !other.done && Math.hypot(x - other.x, y - other.y) < radius * 2);
+  if (wallAt(x, y) || sliders.some(slider => touchesSlider(slider, x, y))) return false;
+  return !balls.some(other => other !== ball && Math.hypot(x - other.x, y - other.y) < radius * 2);
+}
+
+function advanceWater(input, dt) {
+  if (!water) return false;
+  const damping = Math.exp(-2.9 * dt);
+  water.vx = (water.vx + (input.x * 15 - water.x * 26) * dt) * damping;
+  water.vy = (water.vy + (input.y * 15 - water.y * 26) * dt) * damping;
+  water.x += water.vx * dt;
+  water.y += water.vy * dt;
+  if (Math.hypot(water.x, water.y) > .73) {
+    water.spilled = true;
+    lose('傾きすぎて水がこぼれました。');
+  }
+  return true;
 }
 
 function moveBall(dt) {
-  if (state === 'clear') return false;
+  if (state === 'clear' || state === 'failed') return false;
   const input = inputVector();
   if (state === 'ready') {
     if (!input.x && !input.y) return false;
     state = 'playing';
-    say('球が転がり始めました。');
+    say(water ? '水面を見ながら、ゆっくり運びます。' : '球が転がり始めました。');
   }
   elapsed += dt;
+  let changed = advanceWater(input, dt);
+  if (state === 'failed') return true;
   const drag = Math.exp(-3.4 * dt);
-  let changed = false;
-  let redrawBackdrop = false;
+  const electric = level.value === 'electric';
+  const previousGoalCount = balls.filter(atGoal).length;
   for (const ball of balls) {
-    if (ball.done) continue;
     ball.vx = clamp((ball.vx + input.x * 23 * dt) * drag, -6.6, 6.6);
     ball.vy = clamp((ball.vy + input.y * 23 * dt) * drag, -6.6, 6.6);
     const beforeX = ball.x, beforeY = ball.y;
     const x = ball.x + ball.vx * dt, y = ball.y + ball.vy * dt;
+    if (electric && wallAt(x, ball.y, true)) {
+      lose('電流壁に触れました。');
+      return true;
+    }
     if (fitsBall(ball, x, ball.y)) ball.x = x;
     else ball.vx *= -.14;
+    if (electric && wallAt(ball.x, y, true)) {
+      lose('電流壁に触れました。');
+      return true;
+    }
     if (fitsBall(ball, ball.x, y)) ball.y = y;
     else ball.vy *= -.14;
     changed ||= ball.x !== beforeX || ball.y !== beforeY;
 
     const checkpoint = checkpoints[checkpointIndex];
-    if (checkpoint && near(ball, checkpoint)) {
+    if (checkpoint && distance(ball, checkpoint) <= .38) {
       checkpointIndex += 1;
       say(checkpointIndex === checkpoints.length ? 'ゴールの穴が開きました。' : 'チェックポイント通過。次の番号へ。');
-      redrawBackdrop = true;
-    }
-    if (checkpointIndex === checkpoints.length && near(ball, ball.goal)) {
-      ball.done = true;
-      ball.vx = ball.vy = 0;
-      redrawBackdrop = true;
-      if (balls.length > 1) say(`${ball.label}が到着。残りの球を運ぼう。`);
+      updateObjective();
+      drawBackdrop();
     }
   }
-  if (redrawBackdrop) {
+  for (const slider of sliders) changed = moveSlider(slider, input.x, dt) || changed;
+  const goalCount = balls.filter(atGoal).length;
+  if (balls.length > 1 && goalCount !== previousGoalCount) {
     updateObjective();
     drawBackdrop();
+    changed = true;
   }
-  if (balls.every(ball => ball.done)) {
+  if (checkpointIndex === checkpoints.length && goalCount === balls.length) {
     finish();
     return true;
   }
-  return moveSlider(input.x, dt) || changed || redrawBackdrop;
+  return changed;
 }
 
-function near(ball, point) {
-  return Math.hypot(point.x - ball.x, point.y - ball.y) <= .28;
+function distance(ball, point) {
+  return Math.hypot(point.x - ball.x, point.y - ball.y);
+}
+
+function atGoal(ball) {
+  return distance(ball, ball.goal) <= (balls.length > 1 ? .40 : .28);
+}
+
+function lose(message) {
+  state = 'failed';
+  stopMomentum();
+  keys.clear();
+  pointer = undefined;
+  document.querySelector('#fail-reason').textContent = message;
+  fail.hidden = false;
+  say(message);
+  document.querySelector('#fail-title').focus({ preventScroll: true });
 }
 
 function finish() {
@@ -449,7 +501,7 @@ function finish() {
   pointer = undefined;
   if (best === null || elapsed < best) {
     best = elapsed;
-    try { localStorage.setItem(`tilt-maze-best-${level.value}`, String(elapsed)); } catch {}
+    try { localStorage.setItem(recordKey(), String(elapsed)); } catch {}
     updateBest();
   }
   document.querySelector('#result').textContent = seconds(elapsed);
@@ -461,7 +513,7 @@ function finish() {
 
 function paint() {
   ctx.drawImage(backdrop, 0, 0);
-  if (slider) {
+  for (const slider of sliders) {
     const x = slider.x * unit, y = slider.y * unit;
     ctx.fillStyle = '#322d2b80';
     ctx.fillRect(x - 18, y - 16, 44, 42);
@@ -473,7 +525,28 @@ function paint() {
   }
   if (state === 'clear') return;
   for (const ball of balls) {
-    if (!ball.done) paintBall(ball);
+    if (water) paintWater(ball);
+    else paintBall(ball);
+  }
+}
+
+function paintWater(ball) {
+  const x = ball.x * unit, y = ball.y * unit;
+  const r = radius * unit;
+  disc(ctx, x + 3, y + 5, r + 2, '#33291c60');
+  const atRisk = Math.hypot(water.x, water.y) > .53;
+  disc(ctx, x, y, r + 1, '#192b31', atRisk ? '#ffc065' : '#e0f6f1');
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r - 1, 0, Math.PI * 2);
+  ctx.clip();
+  const offsetX = water.x * r, offsetY = water.y * r;
+  disc(ctx, x + offsetX, y + offsetY, water.spilled ? r * .34 : r * .88, '#4dbacb');
+  disc(ctx, x + offsetX - r * .22, y + offsetY - r * .23, r * .22, '#a7f4f4');
+  ctx.restore();
+  if (water.spilled) {
+    disc(ctx, x + offsetX * 2.1, y + offsetY * 2.1, r * .37, '#78c8cc');
+    disc(ctx, x + offsetX * 2.9, y + offsetY * 2.9, r * .20, '#9ad9d7');
   }
 }
 
@@ -523,7 +596,7 @@ function point(event) {
 }
 
 canvas.addEventListener('pointerdown', event => {
-  if (state === 'clear' || pointer || event.button !== 0 || !event.isPrimary) return;
+  if (state === 'clear' || state === 'failed' || pointer || event.button !== 0 || !event.isPrimary) return;
   canvas.focus({ preventScroll: true });
   canvas.setPointerCapture(event.pointerId);
   point(event);
@@ -547,8 +620,13 @@ canvas.addEventListener('keydown', event => {
   if (!arrowKeys.includes(event.key) || event.altKey || event.metaKey || event.ctrlKey) return;
   event.preventDefault();
   keys.add(event.key);
+  shift = event.shiftKey;
 });
-window.addEventListener('keyup', event => keys.delete(event.key));
+window.addEventListener('keydown', event => { if (event.key === 'Shift') shift = true; });
+window.addEventListener('keyup', event => {
+  shift = event.shiftKey;
+  keys.delete(event.key);
+});
 canvas.addEventListener('blur', () => keys.clear());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
@@ -561,7 +639,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 level.addEventListener('change', reset);
-for (const id of ['reset', 'again']) {
+for (const id of ['reset', 'again', 'retry']) {
   document.getElementById(id).addEventListener('click', () => { reset(); canvas.focus(); });
 }
 next.addEventListener('click', () => { level.selectedIndex += 1; reset(); canvas.focus(); });

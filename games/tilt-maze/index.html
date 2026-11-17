@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#142323">
   <title>コロコロ迷路 | ミニゲームアーケード</title>
   <link rel="stylesheet" href="../../assets/site.css?v=2">
-  <link rel="stylesheet" href="./style.css?v=2">
-  <script src="./challenges.js" defer></script>
-  <script src="./game.js?v=2" defer></script>
+  <link rel="stylesheet" href="./style.css?v=3">
+  <script src="./challenges.js?v=3" defer></script>
+  <script src="./game.js?v=3" defer></script>
 </head>
 <body class="game-surface">
   <main>
@@ -21,10 +21,10 @@
       <div class="controls">
         <label for="level">ステージ</label>
         <select id="level">
-          <optgroup label="基本">
-            <option value="easy">かんたん</option>
-            <option value="normal">ふつう</option>
-            <option value="hard">むずかしい</option>
+          <optgroup label="練習">
+            <option value="easy">練習 1</option>
+            <option value="normal">練習 2</option>
+            <option value="hard">練習 3</option>
           </optgroup>
           <optgroup label="上級チャレンジ">
             <option value="spiral">渦巻き</option>
@@ -32,6 +32,8 @@
             <option value="swap">位置の交換</option>
             <option value="gates">順番チェック</option>
             <option value="slider">動く壁</option>
+            <option value="electric">電流壁</option>
+            <option value="water">水運び</option>
           </optgroup>
         </select>
         <button id="tilt" type="button" aria-pressed="false">傾き操作を使う</button>
@@ -45,6 +47,11 @@
           <button id="again" type="button">もう一度</button>
           <button id="next" type="button">次のステージへ</button>
         </div>
+        <div id="fail" class="win" hidden>
+          <h2 id="fail-title" tabindex="-1">チャレンジ失敗</h2>
+          <p id="fail-reason"></p>
+          <button id="retry" type="button">もう一度</button>
+        </div>
       </div>
       <div class="controls stats">
         <span id="time" role="timer">0.0 秒</span>
@@ -54,7 +61,7 @@
       </div>
       <p id="status" role="status">「傾き操作を使う」を押すか、盤面を指で操作してスタート。</p>
     </section>
-    <p class="help">傾き操作は楽に持てる角度を基準にします。指操作は、1球なら進みたい場所を押し、2球なら進みたい方向にドラッグ。PCは盤面を選んで矢印キーで操作できます。</p>
+    <p class="help">傾き操作は楽に持てる角度を基準にします。1球は進みたい場所を押し、2球と水運びは進みたい方向にドラッグします。PCは盤面を選んで矢印キーで操作できます。</p>
   </main>
 </body>
 </html>

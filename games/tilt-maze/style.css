@@ -116,3 +116,15 @@ canvas {
 
 .win h2:focus { outline: none; }
 .win p { margin: .35rem 0 .7rem; }
+
+#fail {
+  border-color: #e6a16e;
+  background: #332821f5;
+}
+
+#retry {
+  color: #30271e;
+  background: #ffc98c;
+  border-color: #ffc98c;
+  font-weight: 700;
+}
