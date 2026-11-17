@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142323">
+  <title>コロコロ迷路 | ミニゲームアーケード</title>
+  <link rel="stylesheet" href="../../assets/site.css?v=2">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./game.js" defer></script>
+</head>
+<body class="game-surface">
+  <main>
+    <a href="../../">← ゲーム一覧</a>
+    <header>
+      <h1>コロコロ迷路</h1>
+      <p>スマホを傾けて、球をゴールの穴へ。</p>
+    </header>
+    <section class="table" aria-label="迷路ゲーム">
+      <div class="controls">
+        <label for="level">難易度</label>
+        <select id="level">
+          <option value="easy">かんたん</option>
+          <option value="normal">ふつう</option>
+          <option value="hard">むずかしい</option>
+        </select>
+        <button id="tilt" type="button" aria-pressed="false">傾き操作を使う</button>
+      </div>
+      <div class="board-wrap">
+        <canvas id="board" tabindex="0" aria-label="球を転がす迷路。盤面を押すか、矢印キーで操作できます。"></canvas>
+        <div id="win" class="win" hidden>
+          <h2 id="win-title" tabindex="-1">ゴール！</h2>
+          <p id="result"></p>
+          <button id="again" type="button">もう一度</button>
+          <button id="next" type="button">次の難易度へ</button>
+        </div>
+      </div>
+      <div class="controls stats">
+        <span id="time" role="timer">0.0 秒</span>
+        <span id="best">ベスト —</span>
+        <button id="calibrate" type="button" disabled>今の角度を基準に</button>
+        <button id="reset" type="button">やり直す</button>
+      </div>
+      <p id="status" role="status">「傾き操作を使う」を押すか、盤面を指で操作してスタート。</p>
+    </section>
+    <p class="help">傾き操作を使うときは、楽に持てる角度で基準を合わせてください。指で操作する場合は、進みたい方向の盤面を長押し。PCでは盤面を選んで矢印キーで操作できます。</p>
+  </main>
+</body>
+</html>
