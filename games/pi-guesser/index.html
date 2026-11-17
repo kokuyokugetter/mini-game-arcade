@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>円周率ゲッサー | ゲッタ〜クソゲーの墓場</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="pi-digits.js"></script>
+  <script defer src="game.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <a class="back" href="../../index.html">← ゲーム一覧</a>
+      <span class="mark" aria-hidden="true">π</span>
+    </header>
+    <h1>円周率ゲッサー</h1>
+    <p class="intro">円周率の一部を見て、<strong>枠で囲んだ数字</strong>が小数点以下の何桁目か当てよう。3.<strong>1</strong>4159…の「1」が1桁目。</p>
+    <section class="console" aria-label="ゲーム">
+      <div class="toolbar">
+        <label for="difficulty">探索範囲
+          <select id="difficulty">
+            <option value="100">1〜100桁</option>
+            <option value="1000">1〜1,000桁</option>
+            <option value="10000">1〜10,000桁</option>
+          </select>
+        </label>
+        <p id="progress"></p>
+      </div>
+      <div class="viewport">
+        <p class="strip-label">現在地の断片 ・ 中央の枠が出題地点</p>
+        <span class="compass" aria-hidden="true">▲ N</span>
+        <div id="digits" class="digits"></div>
+        <p id="feature" class="feature"></p>
+      </div>
+      <form id="guess-form">
+        <div class="scale">
+          <label for="position">桁マップ</label>
+          <input id="position" type="range" min="1" value="50" aria-describedby="range-description">
+          <div id="range-description" class="scale-labels"><span>1桁目</span><span id="range-end"></span></div>
+          <div id="map-result" class="map-result" aria-hidden="true" hidden>
+            <div class="route-line"><span class="guess-pin"></span><span class="answer-pin"></span></div>
+            <div class="pin-legend"><span>予想</span><span>正解</span></div>
+          </div>
+        </div>
+        <div class="actions">
+          <label for="guess">予想する桁
+            <input id="guess" type="number" min="1" step="1" inputmode="numeric" required>
+          </label>
+          <button id="submit" type="submit">ここだ！</button>
+          <button id="next" type="button" hidden>次の問題</button>
+        </div>
+      </form>
+      <p id="result" class="result" role="status"></p>
+      <details>
+        <summary>手がかりを見る</summary>
+        <p id="landmarks"></p>
+      </details>
+    </section>
+  </main>
+</body>
+</html>

@@ -25,6 +25,9 @@
 | スッキリ洗浄室 | `https://<owner>.github.io/mini-game-arcade/games/cleaning-room/` |
 | コロコロ迷路 | `https://<owner>.github.io/mini-game-arcade/games/tilt-maze/` |
 | パルス・ブリッジ | `https://<owner>.github.io/mini-game-arcade/games/pulse-bridge/` |
+| ろくろアート | `https://<owner>.github.io/mini-game-arcade/games/pottery-wheel/` |
+| 虫食いメロディー | `https://<owner>.github.io/mini-game-arcade/games/melody-gap/` |
+| 円周率ゲッサー | `https://<owner>.github.io/mini-game-arcade/games/pi-guesser/` |
 
 トップからは `./games/pref-puzzle/`、ゲームの入口からトップへは `../../` を使う。ゲーム内の素材も `./style.css` のような相対パスで参照する。先頭が `/` のパスはリポジトリ名の階層を飛ばすため、サイト内リンクには使わない。SNS や GitHub のリポジトリ概要欄には、公開後に確認したトップまたはゲーム個別の完全な URL を貼る。
 

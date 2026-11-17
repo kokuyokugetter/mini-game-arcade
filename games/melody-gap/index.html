@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f0df">
+  <title>虫食いメロディー | ゲッタ〜クソゲーの墓場</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="game.js"></script>
+</head>
+<body>
+  <main>
+    <a class="back" href="../../index.html">← ゲーム一覧</a>
+    <header>
+      <h1>虫食いメロディー</h1>
+      <p>曲を聴いて、抜けた1音を見つけよう。</p>
+    </header>
+
+    <section class="instrument" aria-label="虫食いメロディーの操作">
+      <div class="toolbar">
+        <label for="song">曲を選ぶ
+          <select id="song"></select>
+        </label>
+        <button id="play" class="primary">▶ 曲を聴く</button>
+      </div>
+
+      <div class="sheet" id="sheet" tabindex="0" role="group" aria-label="楽譜" aria-describedby="sheet-help">
+        <div class="staff" aria-hidden="true"></div>
+        <div class="notes" id="notes" aria-hidden="true"></div>
+        <div class="playhead" aria-hidden="true"></div>
+      </div>
+      <div class="transport">
+        <button id="previous" aria-label="前の音へ">←</button>
+        <label class="seek-label" for="seek">再生位置</label>
+        <input id="seek" type="range" value="0" aria-label="再生位置">
+        <button id="next" aria-label="次の音へ">→</button>
+      </div>
+      <p class="help" id="sheet-help">横に動かすと、赤線を通る音が鳴ります。縦に動かすと、答えの音程が変わります。</p>
+
+      <div class="answer">
+        <div class="pitch">
+          <button id="lower" aria-label="音程を半音下げる">−</button>
+          <button id="preview" aria-label="選んだ音を聴く"><span id="pitch">ド4</span><small>試聴</small></button>
+          <button id="higher" aria-label="音程を半音上げる">＋</button>
+        </div>
+        <button id="submit" class="primary">この音で答える</button>
+      </div>
+      <p id="status" role="status">最初は抜けた音だけ無音で、曲が最後まで流れます。</p>
+      <footer>
+        <button id="reset" class="quiet">同じ曲で別の問題</button>
+        <a id="source" target="_blank" rel="noopener">楽曲資料 ↗</a>
+      </footer>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#eee7da">
+  <title>ろくろアート | ゲッタ〜クソゲーの墓場</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <main class="studio">
+    <header>
+      <a class="back" href="../../">← ゲーム一覧</a>
+      <h1>ろくろアート</h1>
+      <p>回る粘土から、ひとつの器を。</p>
+    </header>
+    <div class="layout">
+      <section class="stage" aria-label="ろくろ">
+        <canvas id="wheel" tabindex="0" aria-label="成形する粘土" aria-describedby="instructions">
+          このゲームには Canvas 対応ブラウザーが必要です。
+        </canvas>
+        <span class="stage-label" id="stage-label">成形中</span>
+        <button class="spin" id="spin" type="button" aria-pressed="true">回転中</button>
+      </section>
+
+      <section class="panel" aria-label="工房の道具">
+        <div>
+          <h2>形をつくる</h2>
+          <p id="instructions">粘土を横にドラッグして、膨らみやくびれをつくります。キー操作では上下で位置を、左右で太さを変えられます。</p>
+          <div class="presets" aria-label="粘土の初期形状">
+            <button type="button" data-form="cylinder" aria-pressed="true">筒</button>
+            <button type="button" data-form="bowl" aria-pressed="false">鉢</button>
+            <button type="button" data-form="vase" aria-pressed="false">花器</button>
+          </div>
+        </div>
+        <div class="glazes">
+          <h2>色を選ぶ</h2>
+          <div class="swatches" aria-label="仕上げの色">
+            <button type="button" data-glaze="clay" style="--swatch:#ad6850" aria-pressed="true" aria-label="素焼き"></button>
+            <button type="button" data-glaze="ivory" style="--swatch:#e3d4a9" aria-pressed="false" aria-label="生成り"></button>
+            <button type="button" data-glaze="moss" style="--swatch:#71816a" aria-pressed="false" aria-label="苔色"></button>
+            <button type="button" data-glaze="indigo" style="--swatch:#4b6582" aria-pressed="false" aria-label="藍色"></button>
+            <button type="button" data-glaze="plum" style="--swatch:#92556b" aria-pressed="false" aria-label="梅色"></button>
+          </div>
+          <p id="glaze-name" aria-live="polite">素焼き</p>
+        </div>
+        <div class="actions">
+          <button type="button" id="undo" disabled>元に戻す</button>
+          <button type="button" id="reset" disabled>形をリセット</button>
+        </div>
+        <button type="button" id="finish">仕上げる</button>
+        <p class="status" id="status" role="status"></p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

@@ -528,17 +528,6 @@ function ring(x, y, radius, color, line = 2) {
 }
 
 function drawStains() {
-  if (remaining / total <= .1) {
-    for (let i = 0; i < layers.length; i++) {
-      if (!layers[i] || stainIndex[i]) continue;
-      const x = (i % cols + .5) * cell;
-      const y = (Math.floor(i / cols) + .5) * cell;
-      ctx.fillStyle = '#fff8e8';
-      ctx.fillRect(x - 3, y - 3, 6, 6);
-      ctx.fillStyle = '#cf3c22';
-      ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
-    }
-  }
   for (const patch of stains) {
     if (!patch.cells.length) continue;
     const { x, y, kind } = patch;
@@ -573,6 +562,11 @@ function paint() {
     ctx.save();
     ctx.clip(surface.bounds);
     ctx.drawImage(mask, 0, 0, cols * cell, rows * cell);
+    if (remaining <= total * .1) {
+      // Reinforce the original stain without extending its shape or changing its color.
+      ctx.globalAlpha = .35;
+      ctx.drawImage(mask, 0, 0, cols * cell, rows * cell);
+    }
     ctx.restore();
   }
   if (mode === 'polish' && !reduced.matches) {
