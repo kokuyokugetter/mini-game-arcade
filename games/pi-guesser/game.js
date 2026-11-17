@@ -101,6 +101,7 @@ function renderRound() {
 }
 
 function startGame() {
+  if (ArcadeResult.active) return;
   limit = Number(ui.difficulty.value);
   rounds = chooseRounds(limit);
   roundIndex = 0;
@@ -146,9 +147,23 @@ ui.guess.addEventListener("input", () => {
     ui.position.value = ui.guess.value;
   }
 });
+function showFinalResult() {
+  ArcadeResult.show({
+    kind: "clear",
+    title: "全5問クリア！",
+    summary: `最終スコア ${formatter.format(total)} / 5,000 点`,
+    action: "もう一度遊ぶ",
+    onAction: () => {
+      startGame();
+      ui.viewport.focus({ preventScroll: true });
+    },
+    alternate: "最後の答えを見る",
+    onAlternate: () => ui.viewport.focus({ preventScroll: true }),
+  });
+}
 ui["guess-form"].addEventListener("submit", event => {
   event.preventDefault();
-  if (answered || !ui.guess.value || !ui.guess.validity.valid) return;
+  if (ArcadeResult.active || answered || !ui.guess.value || !ui.guess.validity.valid) return;
 
   const { position } = rounds[roundIndex];
   const guess = ui.guess.valueAsNumber;
@@ -161,7 +176,7 @@ ui["guess-form"].addEventListener("submit", event => {
   ui.position.disabled = true;
   ui.submit.hidden = true;
   ui.next.hidden = false;
-  ui.next.textContent = last ? "もう一度遊ぶ" : "次の問題";
+  ui.next.textContent = last ? "結果を見る" : "次の問題";
   ui.result.textContent = `正解は ${formatter.format(position)} 桁目。予想との差は ${formatter.format(distance)} 桁で、+${formatter.format(points)} 点。`;
   ui.progress.textContent = `第 ${roundIndex + 1} / ${ROUND_COUNT} 問 ・ ${formatter.format(total)} 点`;
   if (last) {
@@ -176,9 +191,13 @@ ui["guess-form"].addEventListener("submit", event => {
   ui.next.focus();
 });
 ui.next.addEventListener("click", () => {
+  if (ArcadeResult.active || !answered) return;
+  if (roundIndex === ROUND_COUNT - 1) {
+    showFinalResult();
+    return;
+  }
   roundIndex++;
-  if (roundIndex === ROUND_COUNT) startGame();
-  else renderRound();
+  renderRound();
   ui.viewport.focus({ preventScroll: true });
 });
 ui.difficulty.addEventListener("change", startGame);

@@ -41,8 +41,8 @@ const octaves = document.querySelector('#octaves');
 const feedback = document.querySelector('#feedback');
 const submit = document.querySelector('#submit');
 const next = document.querySelector('#next');
+const practiceResult = document.querySelector('#practice-result');
 const result = document.querySelector('#result');
-const resultTitle = document.querySelector('#result-title');
 const finalScore = document.querySelector('#final-score');
 
 const noteButtons = new Map();
@@ -178,6 +178,7 @@ function showQuestion() {
   play.textContent = '出題音を聴く';
   submit.hidden = false;
   next.hidden = true;
+  practiceResult.hidden = true;
 }
 
 async function playAudio(isCurrent, message, render) {
@@ -217,7 +218,24 @@ play.addEventListener('click', async () => {
 
 reference.addEventListener('click', () => playNotes([middleC]));
 
+function showChordResult() {
+  stopPlayback();
+  finalScore.textContent = `${totalQuestions}点満点中 ${score}点`;
+  game.hidden = true;
+  result.hidden = false;
+  ArcadeResult.show({
+    kind: 'clear',
+    title: score === totalQuestions ? '全問正解！' : '10問クリア！',
+    summary: `${finalScore.textContent}。最終問は ${feedback.textContent}`,
+    action: 'もう一度挑戦',
+    onAction: () => startGame(true),
+    alternate: 'モード選択へ',
+    onAlternate: showSetup,
+  });
+}
+
 submit.addEventListener('click', () => {
+  if (ArcadeResult.active || submit.hidden || submit.disabled) return;
   choices.disabled = true;
   const answers = level === levels['pitch-class']
     ? target.map((note) => note % octaveSize)
@@ -233,26 +251,38 @@ submit.addEventListener('click', () => {
   feedback.textContent = correct ? `正解！ ${answer}` : `不正解。正解は ${answer} です。`;
   submit.hidden = true;
   next.textContent = challengeMode && round === totalQuestions ? '結果を見る' : '次の問題へ';
+  practiceResult.hidden = challengeMode || !correct;
   next.hidden = false;
   next.focus();
 });
 
-next.addEventListener('click', () => {
+function advanceChord() {
+  if (ArcadeResult.active || next.hidden) return;
   if (challengeMode && round === totalQuestions) {
-    stopPlayback();
-    finalScore.textContent = `${totalQuestions}点満点中 ${score}点`;
-    game.hidden = true;
-    result.hidden = false;
-    resultTitle.focus();
+    showChordResult();
     return;
   }
-
   round += 1;
   showQuestion();
   question.focus();
+}
+
+next.addEventListener('click', advanceChord);
+practiceResult.addEventListener('click', () => {
+  if (ArcadeResult.active || practiceResult.hidden) return;
+  ArcadeResult.show({
+    kind: 'clear',
+    title: '音当て正解！',
+    summary: `${target.length}音。 ${feedback.textContent}`,
+    action: '次の問題へ',
+    onAction: advanceChord,
+    alternate: '問題に戻る',
+    onAlternate: () => next.focus({ preventScroll: true }),
+  });
 });
 
 function startGame(random) {
+  if (ArcadeResult.active) return;
   challengeMode = random;
   round = 1;
   score = 0;
@@ -265,6 +295,7 @@ function startGame(random) {
 }
 
 function showSetup() {
+  if (ArcadeResult.active) return;
   stopPlayback();
   game.hidden = true;
   result.hidden = true;
@@ -346,6 +377,7 @@ function showFrequencyQuestion() {
 }
 
 function startFrequency() {
+  if (ArcadeResult.active) return;
   frequencyRound = 1;
   frequencyPoints = 0;
   setup.hidden = true;
@@ -380,7 +412,7 @@ frequencyAnswer.addEventListener('submit', (event) => {
   event.preventDefault();
   const current = frequencyQuestion;
   const guess = frequencyGuess.valueAsNumber;
-  if (frequencyGame.hidden || !current?.heard || current.answered || !frequencyGuess.validity.valid || !Number.isFinite(guess)) return;
+  if (ArcadeResult.active || frequencyGame.hidden || !current?.heard || current.answered || !frequencyGuess.validity.valid || !Number.isFinite(guess)) return;
   current.answered = true;
   stopPlayback();
   frequencyGuess.disabled = frequencySubmit.disabled = true;
@@ -396,12 +428,17 @@ frequencyAnswer.addEventListener('submit', (event) => {
 });
 
 frequencyNext.addEventListener('click', () => {
-  if (frequencyRound < totalQuestions) {
-    frequencyRound += 1;
-    showFrequencyQuestion();
+  if (ArcadeResult.active || frequencyNext.hidden) return;
+  if (frequencyRound === totalQuestions) {
+    showFrequencyResult();
     return;
   }
+  frequencyRound += 1;
+  showFrequencyQuestion();
+});
 
+function showFrequencyResult() {
+  const finalAnswer = frequencyFeedback.textContent;
   stopPlayback();
   frequencyQuestion = undefined;
   frequencyTitle.textContent = 'ヘルツ当て 結果';
@@ -409,15 +446,25 @@ frequencyNext.addEventListener('click', () => {
   frequencyFeedback.textContent = '';
   frequencyAnswer.hidden = frequencyNext.hidden = frequencyPlay.hidden = true;
   frequencyRetry.hidden = false;
-  frequencyTitle.focus();
-});
+  ArcadeResult.show({
+    kind: 'clear',
+    title: frequencyPoints === 100 * totalQuestions ? '満点クリア！' : 'ヘルツ当てクリア！',
+    summary: `${frequencyScore.textContent}。最終問は ${finalAnswer}`,
+    action: 'もう一度挑戦',
+    onAction: startFrequency,
+    alternate: 'モード選択へ',
+    onAlternate: exitFrequency,
+  });
+}
 
 frequencyStart.addEventListener('click', startFrequency);
 frequencyRetry.addEventListener('click', startFrequency);
-document.querySelector('#frequency-exit').addEventListener('click', () => {
+function exitFrequency() {
+  if (ArcadeResult.active) return;
   stopPlayback();
   frequencyQuestion = undefined;
   frequencyGame.hidden = true;
   setup.hidden = false;
   frequencyStart.focus();
-});
+}
+document.querySelector('#frequency-exit').addEventListener('click', exitFrequency);

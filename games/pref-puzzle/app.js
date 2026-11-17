@@ -112,7 +112,6 @@
     shownOver = false;
     lastStats = '';
     lastNext = -1;
-    $('result').hidden = true;
     $('empty-hint').style.opacity = 1;
     updateUI();
     cv.focus({ preventScroll: true });
@@ -154,11 +153,16 @@
     $('complete-total').textContent = PuzzleCore.ROUND_SCORE.toLocaleString('ja-JP');
     $('complete-bonus').textContent = `完成ボーナス +${bonus.toLocaleString('ja-JP')}点`;
     $('next-round').textContent = `${round + 1}周目へ`;
+    $('complete-share').replaceChildren(ArcadeResult.share('全国完成！！',
+      `${round}周目 · ${game.score.toLocaleString('ja-JP')}点`));
     effects.celebrate(game.time);
-    $('next-round').focus({ preventScroll: true });
+    document.querySelector('main').inert = true;
+    const sharing = [...$('complete-share').querySelectorAll('.arcade-share-button')];
+    ArcadeResult.lock([$('next-round'), ...sharing], $('complete-celebration'));
     pulseScore();
   };
   game.onRound = round => {
+    document.querySelector('main').inert = false;
     resetHold(); sound.stop(); effects.reset(); announce(`${round}周目`);
     updateUI(); cv.focus({ preventScroll: true });
   };
@@ -288,12 +292,18 @@
       : `${game.round}周目`;
     $('round-label').classList.toggle('urgent', !game.over && (overflowRemaining !== null || (remaining !== null && remaining <= 5)));
     if (game.over && !shownOver) {
-      shownOver = true; resetHold(); $('result').hidden = false;
-      $('result-title').textContent = 'GAME OVER';
-      $('result-detail').textContent = game.endReason === 'timeout'
-        ? `時間切れ。北海道の落下から15秒経過。完成回数：${game.completed}回。`
-        : `盤面からあふれました。${game.round}周目・${game.dropped}県。完成回数：${game.completed}回。`;
-      $('result-score').textContent = game.score.toLocaleString('ja-JP');
+      shownOver = true;
+      resetHold();
+      const reason = game.endReason === 'timeout'
+        ? '北海道を落としてから時間切れ。'
+        : `盤面があふれました。${game.round}周目・${game.dropped}県。`;
+      ArcadeResult.show({
+        kind: 'over',
+        title: reason,
+        summary: `${game.score.toLocaleString('ja-JP')}点 · 完成 ${game.completed}回`,
+        action: 'もう一度あそぶ',
+        onAction: start,
+      });
     }
   }
 
@@ -350,8 +360,9 @@
     $('reset').classList.add('armed'); $('reset-label').textContent = 'もう一度押す';
     resetTimer = setTimeout(() => { resetTimer = 0; $('reset').classList.remove('armed'); $('reset-label').textContent = 'リセット'; }, 2500);
   });
-  $('retry').addEventListener('click', start);
-  $('next-round').addEventListener('click', () => game.nextRound());
+  $('next-round').addEventListener('click', () => {
+    if (!$('next-round').disabled) game.nextRound();
+  });
   for (const [trigger, id] of [['help', 'help-dialog'], ['credits', 'credits-dialog']]) {
     const dialog = $(id);
     $(trigger).addEventListener('click', () => { paused = true; aiming = null; resetHold(); sound.stop(); dialog.showModal(); });

@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>リム・ブレイカー | ゲッタ〜クソゲーの墓場</title>
   <link rel="stylesheet" href="../../assets/site.css?v=2">
-  <link rel="stylesheet" href="./style.css?v=3">
-  <script src="./game.js?v=4" defer></script>
+  <link rel="stylesheet" href="../../assets/result.css?v=1">
+  <link rel="stylesheet" href="./style.css?v=4">
+  <script src="../../assets/result.js?v=1" defer></script>
+  <script src="./game.js?v=5" defer></script>
 </head>
 <body class="game-surface">
   <main>
@@ -23,7 +25,7 @@
         <div><dt>ベスト</dt><dd id="best">0</dd></div>
       </dl>
       <div class="playfield">
-        <canvas id="board" width="480" height="470" aria-label="ブロック崩しの盤面"></canvas>
+        <canvas id="board" tabindex="0" width="480" height="470" aria-label="ブロック崩しの盤面"></canvas>
         <div id="overlay" class="overlay" hidden>
           <section class="card" aria-labelledby="overlay-title">
             <h2 id="overlay-title" tabindex="-1"></h2>

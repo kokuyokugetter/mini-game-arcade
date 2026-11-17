@@ -1,0 +1,183 @@
+dialog.arcade-result {
+  --result-accent: #97f3ee;
+  --result-edge: #416c7a;
+  box-sizing: border-box;
+  width: min(35rem, calc(100% - 1.8rem));
+  max-width: none;
+  max-height: min(85dvh, 46rem);
+  margin: auto;
+  padding: clamp(1.2rem, 5vw, 2.3rem);
+  overflow: auto;
+  border: 1px solid var(--result-edge);
+  border-radius: 1.3rem;
+  background: radial-gradient(ellipse at 50% 0%, #254557, transparent 74%), #111b2a;
+  color: #f9fafd;
+  text-align: center;
+  box-shadow: 0 1rem 5rem #070d19b8;
+  font-family: system-ui, sans-serif;
+  isolation: isolate;
+}
+
+dialog.arcade-result[data-kind="clear"] {
+  --result-accent: #ffe195;
+  --result-edge: #dcaf55;
+  background: radial-gradient(ellipse at 50% 0%, #563c19, transparent 73%), #231c24;
+}
+
+dialog.arcade-result[data-kind="over"] {
+  --result-accent: #ffaba2;
+  --result-edge: #93525a;
+  background: radial-gradient(ellipse at 50% 0%, #523139, transparent 74%), #241b29;
+}
+
+dialog.arcade-result::backdrop {
+  background: #0a101caa;
+  backdrop-filter: blur(4px);
+}
+
+.arcade-result .arcade-result-badge {
+  margin: 0 0 .5rem;
+  color: var(--result-accent);
+  font: 950 clamp(2.45rem, 11vw, 5rem)/1 system-ui, sans-serif;
+  letter-spacing: -.055em;
+}
+
+.arcade-result[data-kind="clear"] .arcade-result-badge {
+  text-shadow: 0 0 1.1rem #fab54f80, 0 .12rem #9b631f;
+}
+
+.arcade-result .arcade-result-heading {
+  margin: .6rem 0 .35rem;
+  color: #fff9f0;
+  font: 800 clamp(1.18rem, 5vw, 1.75rem)/1.35 system-ui, sans-serif;
+  overflow-wrap: anywhere;
+  outline: none;
+}
+
+.arcade-result .arcade-result-summary {
+  margin: .5rem auto 1rem;
+  color: #e6deed;
+  font: 500 .95rem/1.65 system-ui, sans-serif;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.arcade-result-actions {
+  display: grid;
+  gap: .5rem;
+  margin-top: 1.25rem;
+}
+
+.arcade-result .arcade-result-action,
+.arcade-share .arcade-share-button {
+  box-sizing: border-box;
+  min-height: 2.65rem;
+  padding: .5rem .85rem;
+  border: 1px solid currentColor;
+  border-radius: .55rem;
+  font: 750 .88rem/1.35 system-ui, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
+  text-decoration: none;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.arcade-result .arcade-result-action {
+  background: var(--result-accent);
+  color: #231b26;
+  white-space: normal;
+}
+
+.arcade-result .arcade-result-action + .arcade-result-action {
+  background: #ffffff1a;
+  color: #fff8ea;
+}
+
+.arcade-result .arcade-result-action:disabled {
+  opacity: .43;
+  cursor: wait;
+}
+
+.arcade-result-action-detail {
+  display: block;
+  font-weight: 520;
+}
+
+.arcade-share {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .4rem;
+}
+
+.arcade-share .arcade-share-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #312e44;
+  color: #ffefd0;
+}
+
+.arcade-share .arcade-share-feedback {
+  flex-basis: 100%;
+  margin: 0;
+  color: inherit;
+  font: 500 .82rem/1.4 system-ui, sans-serif;
+  text-align: center;
+}
+
+.arcade-share-feedback:empty {
+  display: none;
+}
+
+.arcade-share .arcade-share-text {
+  box-sizing: border-box;
+  width: 100%;
+  padding: .45rem;
+  color: #f7f4ff;
+  background: #151a28;
+  border: 1px solid #8f829b;
+  border-radius: .4rem;
+  font: .86rem/1.45 system-ui, sans-serif;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.arcade-share :focus-visible,
+.arcade-result .arcade-result-action:focus-visible {
+  outline: 2px solid #94eaff;
+  outline-offset: 2px;
+}
+
+.arcade-result-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.arcade-result-confetti i {
+  position: absolute;
+  top: -1rem;
+  left: var(--x);
+  width: .37rem;
+  height: .65rem;
+  background: hsl(var(--hue) 87% 71%);
+  animation: arcade-confetti 1.5s var(--delay) ease-in both;
+}
+
+@keyframes arcade-confetti {
+  from { opacity: .9; transform: translateY(0) rotate(0); }
+  to { opacity: 0; transform: translateY(20rem) rotate(var(--spin)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcade-result-confetti { display: none; }
+}
+
+.arcade-share .arcade-share-button:is(:disabled, [aria-disabled="true"]) {
+  opacity: .5;
+  cursor: wait;
+}

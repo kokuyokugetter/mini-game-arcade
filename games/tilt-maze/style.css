@@ -99,32 +99,3 @@ canvas {
   margin-top: .55rem;
 }
 .help { margin-top: .65rem; }
-
-.win {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-50%, -50%);
-  width: max-content;
-  box-sizing: border-box;
-  max-width: 93%;
-  padding: .9rem;
-  border: 1px solid #e4cb94;
-  border-radius: .65rem;
-  background: #172b26f2;
-  text-align: center;
-}
-
-.win h2:focus { outline: none; }
-.win p { margin: .35rem 0 .7rem; }
-
-#fail {
-  border-color: #e6a16e;
-  background: #332821f5;
-}
-
-#retry {
-  color: #30271e;
-  background: #ffc98c;
-  border-color: #ffc98c;
-  font-weight: 700;
-}

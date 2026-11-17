@@ -134,6 +134,7 @@ function updateControls() {
 }
 
 function reset(sameSong) {
+  if (ArcadeResult.active) return;
   stop();
   const previous = sameSong ? gapIndex : -1;
   const question = challenge?.questions[challenge.index];
@@ -281,7 +282,7 @@ function changePitch(amount) {
 }
 
 function submitAnswer() {
-  if (!unlocked || solved) return;
+  if (ArcadeResult.active || !unlocked || solved) return;
   const answer = score[gapIndex];
   stop();
   const correct = pitch === answer.pitch;
@@ -297,13 +298,37 @@ function submitAnswer() {
     previewPitch(pitch);
     const answerText = '抜けていた音は ' + namePitch(pitch) + ' です。';
     status.textContent = (correct ? '正解！ ' : namePitch(submitted) + ' は不正解。') + answerText;
-    if (challenge && challenge.index === challenge.questions.length - 1) {
-      status.textContent += ' 結果は ' + challenge.questions.length + '問中 ' + challenge.correct + '問正解です。';
-    }
   } else {
     status.textContent = namePitch(pitch) + ' は違うようです。曲を聴き直して、別の音を試してください。';
   }
   updateControls();
+  if (challenge && challenge.index === challenge.questions.length - 1) {
+    ArcadeResult.show({
+      kind: 'clear',
+      title: challenge.correct === challenge.questions.length ? '全問正解！' : '10問クリア！',
+      summary: `${challenge.questions.length}問中 ${challenge.correct}問正解。 ${status.textContent}`,
+      action: 'もう一度挑戦',
+      onAction: () => {
+        advanceChallenge();
+        play.focus({ preventScroll: true });
+      },
+      alternate: '最後の楽譜を見る',
+      onAlternate: () => $('advance').focus({ preventScroll: true }),
+    });
+  } else if (!challenge && correct) {
+    ArcadeResult.show({
+      kind: 'clear',
+      title: 'メロディー完成！',
+      summary: status.textContent,
+      action: '同じ曲の別の問題',
+      onAction: () => {
+        reset(true);
+        play.focus({ preventScroll: true });
+      },
+      alternate: '楽譜に戻る',
+      onAlternate: () => play.focus({ preventScroll: true }),
+    });
+  }
 }
 
 play.addEventListener('click', () => playSong(-lead));
@@ -321,17 +346,19 @@ for (const picker of [voicePicker, speedPicker]) {
   });
 }
 function changeMode() {
+  if (ArcadeResult.active) return;
   challenge = modePicker.value === 'random' ? makeChallenge() : undefined;
   reset(false);
 }
 
 modePicker.addEventListener('change', changeMode);
-$('advance').addEventListener('click', () => {
-  if (!challenge || !solved) return;
+function advanceChallenge() {
+  if (ArcadeResult.active || !challenge || !solved) return;
   if (challenge.index + 1 === challenge.questions.length) challenge = makeChallenge();
   else challenge.index += 1;
   reset(false);
-});
+}
+$('advance').addEventListener('click', advanceChallenge);
 songPicker.addEventListener('change', () => reset(false));
 $('reset').addEventListener('click', () => reset(true));
 $('previous').addEventListener('click', () => stepNote(-1));

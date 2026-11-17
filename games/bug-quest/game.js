@@ -390,7 +390,13 @@ function finish(id) {
   }
   canvas.setAttribute('aria-label', area.textContent);
   update();
-  area.focus();
+  ArcadeResult.show({
+    kind: id === 'loss' ? 'over' : 'clear',
+    title: id === 'loss' ? 'ゲームオーバー' : '魔王を突破！',
+    summary: id === 'loss' ? '消えた名前。魔王に敗れた……。' : `エンディング「${routes[id].ending}」`,
+    action: id === 'loss' ? '結果を見る' : 'エンディングを見る',
+    onAction: () => area.focus(),
+  });
 }
 
 function battleAction(action) {
@@ -482,7 +488,7 @@ for (const button of document.querySelectorAll('[data-dir]')) {
   button.addEventListener('click', () => move(button.dataset.dir));
 }
 document.addEventListener('keydown', (event) => {
-  if (phase !== 'field' || !Object.hasOwn(arrows, event.key) || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  if (ArcadeResult.active || phase !== 'field' || !Object.hasOwn(arrows, event.key) || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
   event.preventDefault();
   move(arrows[event.key]);
 });

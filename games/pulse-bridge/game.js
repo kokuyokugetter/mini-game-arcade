@@ -6,7 +6,6 @@ const overlay = document.querySelector('#overlay');
 const title = document.querySelector('#overlay-title');
 const description = document.querySelector('#overlay-copy');
 const startButton = document.querySelector('#start');
-const restartButton = document.querySelector('#restart');
 const pulseButton = document.querySelector('#pulse');
 const pauseButton = document.querySelector('#pause');
 const soundButton = document.querySelector('#sound');
@@ -558,7 +557,6 @@ function openPanel(heading, text, action) {
   title.textContent = heading;
   description.textContent = text;
   startButton.textContent = action;
-  restartButton.hidden = state !== 'defeat' || game.stage !== 2;
   overlay.hidden = false;
   title.focus({ preventScroll: true });
 }
@@ -582,8 +580,20 @@ function finish(won, reason) {
     store(bestKey, best);
   }
   updateHud();
-  const info = `${reason} ${normalize.format(score)}点`;
-  if (!won) openPanel('作戦終了', info, game.stage === 2 ? '2面をリトライ' : 'もう一度出撃');
+  if (!won) {
+    ArcadeResult.show({
+      kind: 'over',
+      title: 'ゲームオーバー',
+      summary: `${game.stage}面 · ${reason} ${normalize.format(score)}点`,
+      action: game.stage === 2 ? '2面に再挑戦' : 'もう一度出撃',
+      onAction: start,
+      alternate: game.stage === 2 ? '1面から出撃' : undefined,
+      onAlternate: () => {
+        state = 'ready';
+        start();
+      },
+    });
+  }
   say(won ? (game.stage === 1 ? '海上橋を突破。次は夜の要塞。' : '全2面を突破！') : reason);
   cue(won ? 'win' : 'loss');
 }
@@ -651,11 +661,16 @@ function frame(now) {
       finishDelay -= dt;
       if (finishDelay <= 0) {
         const score = normalize.format(Math.floor(game.score));
-        if (state === 'stage-clear') {
-          openPanel('1面クリア！', `生存 ${game.units}機 · ${score}点。部隊を補給して夜の要塞へ。`, '2面へ');
-        } else {
-          openPanel('全2面クリア！', `生存 ${game.units}機 · 最大連鎖 ×${game.peak} · ${score}点`, '1面から出撃');
-        }
+        const midway = state === 'stage-clear';
+        ArcadeResult.show({
+          kind: 'clear',
+          title: midway ? '1面クリア！' : '全2面クリア！',
+          summary: midway
+            ? `生存 ${game.units}機 · ${score}点。部隊を補給して夜の要塞へ。`
+            : `生存 ${game.units}機 · 最大連鎖 ×${game.peak} · ${score}点`,
+          action: midway ? '2面へ' : '1面から出撃',
+          onAction: start,
+        });
       }
     }
   }
@@ -663,10 +678,8 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-startButton.addEventListener('click', start);
-restartButton.addEventListener('click', () => {
-  state = 'ready';
-  start();
+startButton.addEventListener('click', () => {
+  if (state === 'ready' || state === 'paused') start();
 });
 pauseButton.addEventListener('click', pause);
 pulseButton.addEventListener('click', () => {

@@ -73,9 +73,6 @@ const status = document.querySelector('#status');
 const clock = document.querySelector('#time');
 const objective = document.querySelector('#objective');
 const bestLabel = document.querySelector('#best');
-const win = document.querySelector('#win');
-const next = document.querySelector('#next');
-const fail = document.querySelector('#fail');
 const keys = new Set();
 const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 const radius = .29;
@@ -313,10 +310,7 @@ function reset() {
   elapsed = 0;
   state = 'ready';
   clock.textContent = seconds(0);
-  win.hidden = true;
-  fail.hidden = true;
   shift = false;
-  next.hidden = level.selectedIndex === level.options.length - 1;
   canvas.width = maze[0].length * unit;
   canvas.height = maze.length * unit;
   best = null;
@@ -483,15 +477,24 @@ function atGoal(ball) {
   return distance(ball, ball.goal) <= (balls.length > 1 ? .40 : .28);
 }
 
+function retry() {
+  reset();
+  canvas.focus({ preventScroll: true });
+}
+
 function lose(message) {
   state = 'failed';
   stopMomentum();
   keys.clear();
   pointer = undefined;
-  document.querySelector('#fail-reason').textContent = message;
-  fail.hidden = false;
   say(message);
-  document.querySelector('#fail-title').focus({ preventScroll: true });
+  ArcadeResult.show({
+    kind: 'over',
+    title: 'ゲームオーバー',
+    summary: `${level.selectedOptions[0].textContent} · ${message}`,
+    action: 'もう一度挑戦',
+    onAction: retry,
+  });
 }
 
 function finish() {
@@ -499,16 +502,27 @@ function finish() {
   stopMomentum();
   keys.clear();
   pointer = undefined;
-  if (best === null || elapsed < best) {
+  const record = best === null || elapsed < best;
+  if (record) {
     best = elapsed;
     try { localStorage.setItem(recordKey(), String(elapsed)); } catch {}
     updateBest();
   }
-  document.querySelector('#result').textContent = seconds(elapsed);
-  win.hidden = false;
   say(level.value === 'swap' ? '2球の出発位置を入れ替えました。'
     : balls.length > 1 ? '2球ともゴールの穴に入りました。' : 'ゴールの穴に入りました。');
-  document.querySelector('#win-title').focus({ preventScroll: true });
+  const hasNext = level.selectedIndex < level.options.length - 1;
+  ArcadeResult.show({
+    kind: 'clear',
+    title: 'ステージクリア！',
+    summary: `${level.selectedOptions[0].textContent} · ${seconds(elapsed)}${record ? ' · 自己ベスト更新！' : ''}`,
+    action: hasNext ? '次のステージへ' : 'もう一度挑戦',
+    onAction: () => {
+      if (hasNext) level.selectedIndex += 1;
+      retry();
+    },
+    alternate: hasNext ? '同じステージに再挑戦' : undefined,
+    onAlternate: retry,
+  });
 }
 
 function paint() {
@@ -638,11 +652,12 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-level.addEventListener('change', reset);
-for (const id of ['reset', 'again', 'retry']) {
-  document.getElementById(id).addEventListener('click', () => { reset(); canvas.focus(); });
-}
-next.addEventListener('click', () => { level.selectedIndex += 1; reset(); canvas.focus(); });
+level.addEventListener('change', () => {
+  if (!ArcadeResult.active) reset();
+});
+document.querySelector('#reset').addEventListener('click', () => {
+  if (!ArcadeResult.active) retry();
+});
 tilt.addEventListener('click', toggleMotion);
 calibrate.addEventListener('click', setNeutral);
 reset();

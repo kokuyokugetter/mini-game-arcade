@@ -57,7 +57,7 @@ function beginRound() {
 }
 
 function activate(stamp) {
-  if (document.hidden) return;
+  if (document.hidden || ArcadeResult.active) return;
   if (state === 'waiting' || state === 'signal' && stamp < signalAt) {
     cancelSignal();
     render('early', 'フライング！', '押してこの回をやり直す');
@@ -75,10 +75,20 @@ function activate(stamp) {
       best = average;
       try { localStorage.setItem(bestKey, String(best)); } catch {}
     }
-    render('finished', `平均 ${ms(average)}`, record ? '自己ベスト更新！ · 押してもう一度' : '押してもう一度');
+    render('finished', `平均 ${ms(average)}`, record ? '自己ベスト更新！' : '3回の測定完了');
+    ArcadeResult.show({
+      kind: 'clear',
+      title: record ? `自己ベスト更新 · 平均 ${ms(average)}` : `平均 ${ms(average)}`,
+      summary: samples.map(ms).join(' / '),
+      action: 'もう一度測る',
+      onAction: () => {
+        samples = [];
+        beginRound();
+        pad.focus({ preventScroll: true });
+      },
+    });
     return;
   }
-  if (state === 'finished') samples = [];
   beginRound();
 }
 

@@ -496,7 +496,13 @@ function animate(dt) {
     finishCopy.textContent = `これまでに ${completed.toLocaleString('ja-JP')} 件きれいにしました。`;
     finish.hidden = false;
     redraw = true;
-    finishTitle.focus({ preventScroll: true });
+    ArcadeResult.show({
+      kind: 'clear',
+      title: '洗浄完了！',
+      summary: `汚れをすべて落としました。累計 ${completed.toLocaleString('ja-JP')} 件達成！`,
+      action: '仕上がりを見る',
+      onAction: () => finishTitle.focus({ preventScroll: true }),
+    });
   }
   for (let i = drops.length - 1; i >= 0; i--) {
     const drop = drops[i];

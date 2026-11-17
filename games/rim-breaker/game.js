@@ -302,32 +302,45 @@ function togglePause() {
 function nextSector() {
   stage += 1;
   loadSector();
-  action.focus({ preventScroll: true });
+  canvas.focus({ preventScroll: true });
 }
 
 function sectorClear() {
-  score += 400 + Math.min(stage, 100) * 100;
+  const bonus = 400 + Math.min(stage, 100) * 100;
+  score += bonus;
   saveBest();
   tone(660, .18, 'triangle');
-  if (stage !== 1 && stage % 3 !== 0) {
-    const cleared = stage;
-    nextSector();
-    say(stage % 5 === 0 ? '次は装甲セクター。爆風は装甲ごと壊せる。' : `セクター ${cleared} 突破。狙いを決めて発射。`);
-    return;
-  }
   mode = 'reward';
-  const available = shuffle(upgrades.filter(({ id, limit }) => loadout[id] < limit));
-  const rewards = available.slice(0, 2).map((upgrade) => ({
-    ...upgrade,
-    choose: () => {
-      loadout[upgrade.id] += 1;
-      nextSector();
-    },
-  }));
-  rewards.push(lives < 5
-    ? { name: '補給', description: '残機を1つ回復。最大5。', choose: () => { lives += 1; nextSector(); } }
-    : { name: 'スコア換金', description: 'スコア＋750。残機は満タン。', choose: () => { score += 750; saveBest(); nextSector(); } });
-  showOverlay(`セクター ${stage} 突破`, rewards.length > 1 ? '次のセクターに持ち込む報酬を選ぶ。' : '報酬を受け取って次へ。', rewards);
+  keys.clear();
+  drag = null;
+  const title = `セクター ${stage} クリア！`;
+  const summary = `クリアボーナス +${number.format(bonus)}点 · 合計 ${number.format(score)}点`;
+  if (stage === 1 || stage % 3 === 0) {
+    const available = shuffle(upgrades.filter(({ id, limit }) => loadout[id] < limit));
+    const choices = available.slice(0, 2).map(upgrade => ({
+      label: upgrade.name,
+      detail: upgrade.description,
+      onSelect: () => {
+        loadout[upgrade.id] += 1;
+        nextSector();
+      },
+    }));
+    choices.push(lives < 5
+      ? { label: '補給', detail: '残機を1つ回復。最大5。', onSelect: () => { lives += 1; nextSector(); } }
+      : { label: 'スコア換金', detail: 'スコア＋750。残機は満タン。', onSelect: () => { score += 750; saveBest(); nextSector(); } });
+    ArcadeResult.show({ kind: 'clear', title, summary: `${summary}。次に持ち込む報酬を選ぼう。`, choices });
+  } else {
+    ArcadeResult.show({
+      kind: 'clear',
+      title,
+      summary,
+      action: '次のセクターへ',
+      onAction: () => {
+        nextSector();
+        if (stage % 5 === 0) say('次は装甲セクター。爆風は装甲ごと壊せる。');
+      },
+    });
+  }
   say('セクター突破。');
   updateHud();
 }
@@ -339,14 +352,19 @@ function miss() {
     return;
   }
   mode = 'over';
+  keys.clear();
+  drag = null;
   saveBest();
-  showOverlay('航行終了', `セクター ${stage} · ${number.format(score)} 点`, [{
-    name: 'もう一度',
-    choose: () => {
+  ArcadeResult.show({
+    kind: 'over',
+    title: 'ゲームオーバー',
+    summary: `セクター ${stage} · ${number.format(score)}点。残機がなくなりました。`,
+    action: '最初から挑戦',
+    onAction: () => {
       start();
-      action.focus({ preventScroll: true });
+      canvas.focus({ preventScroll: true });
     },
-  }]);
+  });
   say('残機がなくなりました。');
   updateHud();
   tone(110, .2, 'triangle');

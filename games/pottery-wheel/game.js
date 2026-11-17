@@ -300,6 +300,13 @@ saveButton.addEventListener("click", () => {
   link.href = image.toDataURL("image/png");
   link.download = "rokuro-art.png";
   link.click();
+  ArcadeResult.show({
+    kind: "clear",
+    title: "作品完成！",
+    summary: "ろくろで描いた模様をPNGにしました。",
+    action: "作品に戻る",
+    onAction: () => canvas.focus({ preventScroll: true }),
+  });
 });
 
 new ResizeObserver(resize).observe(canvas);

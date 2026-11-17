@@ -177,11 +177,6 @@ button:focus-visible, canvas:focus-visible, a:focus-visible {
   text-align: center;
 }
 
-#restart:not([hidden]) {
-  display: block;
-  margin: .45rem auto 0;
-}
-
 .hud dd.critical {
   color: #ff9a81;
 }
