@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f5ef">
+  <title>いろのわ | 色の見え方チェック</title>
+  <meta name="description" content="点の中の輪っかは、どちらに開いている？ 色の違いを観察する12枚。見え方の記録と、色覚についての研究を紹介します。">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <main>
+    <nav><a href="../../">← 一覧へ</a><span>COLOR OBSERVATION / 01</span></nav>
+    <header class="hero">
+      <div><p class="eyebrow">色には、いろんな見え方がある。</p><h1>いろのわ<span>色の見え方チェック</span></h1>
+      <p class="intro">小さな点の中に、ひとつの輪っか。<br>切れ目の向きを、ゆっくり探してみよう。</p>
+      <p class="caption">12枚 · 時間制限なし · 音なし</p></div>
+      <canvas id="cover" width="480" height="480" aria-hidden="true"></canvas>
+    </header>
+    <section id="setup" class="panel" aria-labelledby="setup-title">
+      <div class="section-top"><span class="step">01 / 準備</span><span class="pill">まずは、画面を整える</span></div>
+      <h2 id="setup-title">いまの見え方を、観察しよう。</h2>
+      <p>これは独自に作った色の課題です。<strong>この画面だけでは、色覚の判定はできません。</strong>すべて見えても色覚の違いは否定できず、見えにくくても色覚異常とは限りません。</p>
+      <form id="setup-form">
+        <fieldset><legend>始める前に</legend>
+          <label><input type="checkbox" name="environment" required> Night Shift・True Tone・ブルーライト軽減・色補正などを切り、映り込みを避けた</label>
+          <label><input type="checkbox" name="comfort" required> 普段の眼鏡などで見て、画面を正面から無理なく見られる明るさにした</label>
+          <label><input type="checkbox" name="limits" required> 画面設定を整えても検査用の校正にはならず、結果から診断や適性の判断はできないと理解した</label>
+        </fieldset>
+        <p class="small">色付きレンズは見え方に影響します。普段の状態で無理なく観察してください。お子さんには回答を誘導せず、見えないときも責めないでください。</p>
+        <button class="primary" id="start" type="submit">練習してみる <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="small">回答はこのページのメモリ内だけに保持します。回答の送信・自動保存はしません。ページを閉じると消えます。</p>
+      <noscript><p class="notice">このチェックにはJavaScriptが必要です。下の「根拠とつくり方」はそのまま読めます。</p></noscript>
+    </section>
+    <section id="session" class="panel" aria-labelledby="session-title" hidden>
+      <div class="section-top"><span class="step" id="phase">02 / 練習</span><button id="quit" class="text-button" type="button">中断して回答を消す</button></div>
+      <h2 id="session-title" tabindex="-1">輪っかの切れ目は、どっち？</h2>
+      <p id="instruction">まずは明暗の差がある練習です。右に開いた輪っかを探してください。</p>
+      <progress id="progress" max="12" value="0" aria-label="回答済みの枚数"></progress>
+      <div class="task-layout">
+        <div class="plate-wrap"><canvas id="plate" width="640" height="640" role="img" aria-label="色の点で描かれた輪っか。切れ目の向きを選んでください。"></canvas></div>
+        <div class="controls"><p class="small">切れ目の向きを選んでから<br>「次の一枚へ」を押してください。</p>
+          <div class="directions" role="group" aria-label="切れ目の向き">
+            <button type="button" data-answer="3" aria-pressed="false">↑<span>上</span></button>
+            <button type="button" data-answer="2" aria-pressed="false">←<span>左</span></button>
+            <button type="button" data-answer="0" aria-pressed="false">→<span>右</span></button>
+            <button type="button" data-answer="1" aria-pressed="false">↓<span>下</span></button>
+          </div>
+          <button type="button" data-answer="unsure" class="unsure" aria-pressed="false">わからない・見えない</button>
+          <button id="next" class="primary" type="button" disabled>次の一枚へ →</button>
+          <p id="feedback" role="status" class="small"></p>
+        </div>
+      </div>
+      <p class="small">拡大したり、近づきすぎたりせず、迷ったら「わからない」で大丈夫。疲れたら中断しましょう。画面の視覚課題なので、読み上げだけでは回答できません。</p>
+    </section>
+    <section id="result" class="panel" aria-labelledby="result-title" hidden>
+      <div class="section-top"><span class="step">03 / 観察メモ</span><span class="pill">見え方は、人それぞれ。</span></div>
+      <h2 id="result-title" tabindex="-1">今日の、いろのわ。</h2>
+      <p>この端末・この環境での回答をまとめました。点数や合否ではありません。</p>
+      <div class="table-scroll"><table><caption>色の組み合わせごとの記録（各4枚）</caption><thead><tr><th scope="col">組み合わせ</th><th scope="col">向きが一致</th><th scope="col">向きが不一致</th><th scope="col">わからない</th></tr></thead><tbody id="summary"></tbody></table></div>
+      <p id="result-message" class="notice"></p>
+      <p><strong>この結果から「正常」「異常」や、1型・2型・3型、程度は判定できません。</strong>見えにくかった色の組み合わせが、そのまま日常での苦手な色を示すわけでもありません。</p>
+      <p>進学・就職・運転などの適性判断や、他の人の評価には使わないでください。</p>
+      <div class="actions"><button id="download" type="button" class="primary">観察メモを保存 ↓</button><button id="reset" type="button">回答を消して戻る</button></div>
+      <p class="small">保存する場合だけ、端末にテキストファイルを作ります。共有するときは見え方に関する個人情報の扱いに気をつけてください。繰り返し正解を覚えても、色覚が評価できるようにはなりません。</p>
+    </section>
+    <section class="evidence" aria-labelledby="evidence-title">
+      <p class="eyebrow">BEHIND THE COLORS</p><h2 id="evidence-title">根拠と、つくり方。</h2>
+      <p>気軽に触れるものだからこそ、わかることの範囲も大切にしています。</p>
+      <details><summary>ブラウザで、どこまでわかる？</summary><p>デジタルの色覚検査には研究があります。ただし、特定の検査・機器・手順で得られた性能が、別のウェブページにも当てはまるわけではありません。2025年のCVS研究では、未校正の市販画面で色覚の違いを見逃す例が報告されました。sRGB設定だけでは、正確な色の表示は保証できません。<a href="https://pubmed.ncbi.nlm.nih.gov/40793535/">Evansほか（2025）、JOSA A、DOI: 10.1364/JOSAA.544986</a></p></details>
+      <details><summary>この12枚は、どう作っている？</summary><p>色の点に輪っかを埋め込み、4方向から切れ目を選ぶ独自の課題です。3組の配色を、それぞれ2段階の色差で2枚ずつ表示します。位置・大きさ・明るさにばらつきを付け、順番と向きをランダムにしています。明るさなどが手掛かりになる可能性もあり、色だけを分離して測定できる設計ではありません。</p><p>既存の石原表・HRR・D-15・CADなどの検査図版や採点基準は使っていません。本課題について臨床検証、標準化、医師の監修は受けておらず、感度・特異度も不明です。赤緑・青黄の色覚異常を検出する性能は確認されていません。</p></details>
+      <details><summary>実際の色覚検査とは、何が違う？</summary><p>色覚検査表やパネルD-15など、標準的な検査には定められた手順と条件があり、検査ごとに調べられることが異なります。この課題はそれらの代わりにはなりません。<a href="https://www.nichigan.or.jp/public/disease/name.html?pdid=33">日本眼科学会「先天色覚異常」</a></p><p>生まれつきの違いのほか、病気や薬などで色の見え方が変わることもあります。この課題は見え方の変化の原因を調べるものではありません。<a href="https://www.nei.nih.gov/eye-health-information/eye-conditions-and-diseases/color-blindness">米国National Eye Institute「Color Blindness」</a></p></details>
+      <details><summary>どうして「正常・異常」を出さないの？</summary><p>画面・照明・視力・疲れ・操作への慣れなども回答に影響します。独自の課題に医学的な境界値を付ける根拠はありません。見え方の違いを能力の優劣として扱わず、今回の画面での観察記録として読んでください。</p></details>
+      <p class="small">資料確認日：2026年11月20日 · 実装 v1.0 · 外部フォント・解析・広告なし</p>
+    </section>
+    <footer><a href="../../">← ゲーム一覧に戻る</a><span>いろのわ / COLOR OBSERVATION</span></footer>
+  </main>
+</body>
+</html>

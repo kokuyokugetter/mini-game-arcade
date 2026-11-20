@@ -28,6 +28,9 @@
 | ろくろアート | `https://<owner>.github.io/mini-game-arcade/games/pottery-wheel/` |
 | 虫食いメロディー | `https://<owner>.github.io/mini-game-arcade/games/melody-gap/` |
 | pi guesser | `https://<owner>.github.io/mini-game-arcade/games/pi-guesser/` |
+| いろのわ | `https://<owner>.github.io/mini-game-arcade/games/color-check/` |
+
+「いろのわ」は色の見え方を観察する独自課題です。色覚異常の検出性能は未検証で、診断や適性判断には使えません。医学文献と実装上の判断・今後の検証条件は [調査メモ](games/color-check/RESEARCH.md) に記録しています。
 
 トップからは `./games/pref-puzzle/`、ゲームの入口からトップへは `../../` を使う。ゲーム内の素材も `./style.css` のような相対パスで参照する。先頭が `/` のパスはリポジトリ名の階層を飛ばすため、サイト内リンクには使わない。SNS や GitHub のリポジトリ概要欄には、公開後に確認したトップまたはゲーム個別の完全な URL を貼る。
 
