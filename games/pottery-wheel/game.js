@@ -5,6 +5,10 @@ const canvas = get("wheel");
 const context = canvas.getContext("2d");
 const ink = document.createElement("canvas");
 const inkContext = ink.getContext("2d");
+const exposure = document.createElement("canvas");
+const exposureContext = exposure.getContext("2d");
+const trailInput = get("trail");
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const spinButton = get("spin");
 const widthInput = get("width");
 const speedInput = get("speed");
@@ -21,6 +25,7 @@ ink.width = ink.height = radius * 2;
 let color = swatches[0].dataset.ink;
 let spinning = !matchMedia("(prefers-reduced-motion: reduce)").matches;
 let angle = 0;
+let orientations = [];
 let lastFrame = 0;
 let frame = 0;
 let strokes = [];
@@ -55,6 +60,8 @@ function resize() {
     scale: Math.max(1, diameter) / (rim * 2),
     centerY: height / 2 + (small ? 19 : 16)
   };
+  const exposureSize = Math.min(440, Math.max(1, Math.ceil(radius * 2 * view.scale)));
+  exposure.width = exposure.height = exposureSize;
   invalidate();
 }
 
@@ -126,15 +133,53 @@ function end() {
 function advance(now) {
   if (spinning && lastFrame) {
     const elapsed = Math.min(Math.max(0, now - lastFrame), 45);
-    angle = (angle + elapsed * Number(speedInput.value) * fullTurn / 60000) % fullTurn;
+    angle += elapsed * Number(speedInput.value) * fullTurn / 60000;
   }
   if (now > lastFrame) lastFrame = now;
+}
+
+function drawExposure(now) {
+  const duration = spinning && !reducedMotion.matches ? Number(trailInput.value) : 0;
+  orientations.push({ time: now, angle });
+  while (orientations.length > 1 && orientations[1].time < now - 220) orientations.shift();
+  exposureContext.clearRect(0, 0, exposure.width, exposure.height);
+  const oldest = Math.max(now - duration, orientations[0].time);
+  const historyDuration = now - orientations[0].time;
+  const rotation = historyDuration > 0
+    ? (orientations.at(-1).angle - orientations[0].angle) * (now - oldest) / historyDuration
+    : 0;
+  const count = duration && oldest < now
+    ? Math.min(48, Math.max(2, Math.ceil(Math.abs(rotation) * exposure.width / 3)))
+    : 1;
+  exposureContext.save();
+  exposureContext.scale(exposure.width / ink.width, exposure.height / ink.height);
+  exposureContext.translate(radius, radius);
+  // Integrate equally spaced moments, independent of display refresh rate.
+  exposureContext.globalCompositeOperation = "lighter";
+  let index = 0;
+  let totalWeight = 0;
+  for (let sample = 0; sample < count; sample++) totalWeight += 1 + sample / count;
+  for (let sample = 0; sample < count; sample++) {
+    const time = count === 1 ? now : oldest + (now - oldest) * sample / (count - 1);
+    while (index + 1 < orientations.length && orientations[index + 1].time < time) index++;
+    const before = orientations[index];
+    const after = orientations[Math.min(index + 1, orientations.length - 1)];
+    const fraction = after.time > before.time ? (time - before.time) / (after.time - before.time) : 0;
+    const sampleAngle = before.angle + (after.angle - before.angle) * fraction;
+    exposureContext.save();
+    exposureContext.rotate(sampleAngle);
+    exposureContext.globalAlpha = (1 + sample / count) / totalWeight;
+    exposureContext.drawImage(ink, -radius, -radius);
+    exposureContext.restore();
+  }
+  exposureContext.restore();
 }
 
 function paint(now) {
   frame = 0;
   advance(now);
   if (current) sample(pointer?.point ?? cursor);
+  drawExposure(now);
 
   const { width, height, scale, ratio, centerY } = view;
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -165,11 +210,16 @@ function paint(now) {
     const tick = index * fullTurn / 48;
     circle(context, Math.cos(tick) * 398, Math.sin(tick) * 398, index % 12 ? 1.5 : 3.5, "#d2cbd289");
   }
+  context.restore();
   circle(context, 0, 0, radius, "#fffefa");
   context.save();
   context.clip();
-  context.drawImage(ink, -radius, -radius);
-  context.restore();
+  if (spinning && Number(trailInput.value) && !reducedMotion.matches) {
+    context.drawImage(exposure, -radius, -radius, radius * 2, radius * 2);
+  } else {
+    context.rotate(angle);
+    context.drawImage(ink, -radius, -radius);
+  }
   context.restore();
 
   if (keyboardFocus && !pointer) {
@@ -253,6 +303,7 @@ canvas.addEventListener("keydown", event => {
 spinButton.addEventListener("click", () => {
   spinning = !spinning;
   lastFrame = 0;
+  orientations = [];
   updateButtons();
   invalidate();
 });
@@ -262,7 +313,19 @@ swatches.forEach(button => button.addEventListener("click", () => {
   swatches.forEach(swatch => swatch.setAttribute("aria-pressed", swatch === button));
 }));
 widthInput.addEventListener("input", () => { get("width-value").value = widthInput.value; });
-speedInput.addEventListener("input", () => { get("speed-value").value = `${speedInput.value} rpm`; });
+speedInput.addEventListener("input", () => {
+  advance(performance.now());
+  get("speed-value").value = `${speedInput.value} rpm`;
+  invalidate();
+});
+trailInput.addEventListener("input", () => {
+  get("trail-value").value = Number(trailInput.value) ? `${trailInput.value} ms` : "なし";
+  invalidate();
+});
+reducedMotion.addEventListener("change", () => {
+  orientations = [];
+  invalidate();
+});
 
 function stopActiveStroke() {
   if (pointer) {

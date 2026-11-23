@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="style.css?v=2">
   <link rel="stylesheet" href="../../assets/result.css?v=1">
   <script src="../../assets/result.js?v=1" defer></script>
-  <script src="game.js?v=3" defer></script>
+  <script src="game.js?v=4" defer></script>
 </head>
 <body>
   <main class="studio">
@@ -43,6 +43,10 @@
           <input type="range" id="speed" min="8" max="90" value="36">
         </div>
         <div class="control">
+          <label for="trail">残像の長さ</label><output id="trail-value" for="trail">120 ms</output>
+          <input type="range" id="trail" min="0" max="200" step="10" value="120" aria-describedby="trail-note">
+        </div>
+        <div class="control">
           <label for="repeat">模様の繰り返し</label>
           <select id="repeat">
             <option value="1">なし</option>
@@ -61,6 +65,7 @@
         <details>
           <summary>描き方</summary>
           <p id="instructions">同じ場所を押し続けると円に、中心へ動かすと渦になります。回転を止めると、好きな形を描けます。</p>
+          <p id="trail-note">残像を長くすると、回る模様が溶け合って見えます。止めると元の線を確認できます。</p>
           <p id="keys">キー操作では、矢印でペンを動かし、スペースでペンを出し入れできます。</p>
         </details>
         <p class="sr-only" id="status" role="status"></p>
