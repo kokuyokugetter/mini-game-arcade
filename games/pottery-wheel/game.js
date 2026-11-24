@@ -138,10 +138,17 @@ function advance(now) {
   if (now > lastFrame) lastFrame = now;
 }
 
-function drawExposure(now) {
-  const duration = spinning && !reducedMotion.matches ? Number(trailInput.value) : 0;
+function trailStrength() {
+  if (!spinning || reducedMotion.matches || Number(trailInput.value) === 0) return 0;
+  const speed = Math.max(0, Math.min(1, (Number(speedInput.value) - 24) / 48));
+  return speed * speed * (3 - 2 * speed);
+}
+
+function drawExposure(now, strength) {
+  const duration = Number(trailInput.value) * strength;
   orientations.push({ time: now, angle });
   while (orientations.length > 1 && orientations[1].time < now - 220) orientations.shift();
+  if (!duration) return;
   exposureContext.clearRect(0, 0, exposure.width, exposure.height);
   const oldest = Math.max(now - duration, orientations[0].time);
   const historyDuration = now - orientations[0].time;
@@ -168,10 +175,13 @@ function drawExposure(now) {
     const sampleAngle = before.angle + (after.angle - before.angle) * fraction;
     exposureContext.save();
     exposureContext.rotate(sampleAngle);
-    exposureContext.globalAlpha = (1 + sample / count) / totalWeight;
+    exposureContext.globalAlpha = strength * .72 * (1 + sample / count) / totalWeight;
     exposureContext.drawImage(ink, -radius, -radius);
     exposureContext.restore();
   }
+  exposureContext.rotate(angle);
+  exposureContext.globalAlpha = 1 - strength * .72;
+  exposureContext.drawImage(ink, -radius, -radius);
   exposureContext.restore();
 }
 
@@ -179,7 +189,8 @@ function paint(now) {
   frame = 0;
   advance(now);
   if (current) sample(pointer?.point ?? cursor);
-  drawExposure(now);
+  const strength = trailStrength();
+  drawExposure(now, strength);
 
   const { width, height, scale, ratio, centerY } = view;
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -214,7 +225,7 @@ function paint(now) {
   circle(context, 0, 0, radius, "#fffefa");
   context.save();
   context.clip();
-  if (spinning && Number(trailInput.value) && !reducedMotion.matches) {
+  if (strength > 0) {
     context.drawImage(exposure, -radius, -radius, radius * 2, radius * 2);
   } else {
     context.rotate(angle);
