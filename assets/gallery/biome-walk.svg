@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="352" viewBox="0 0 640 352">
+<defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#8fbdc7"/><stop offset="1" stop-color="#dae1bb"/></linearGradient><linearGradient id="land" x2="0" y2="1"><stop stop-color="#a0b978"/><stop offset="1" stop-color="#4a7049"/></linearGradient></defs>
+<path fill="url(#sky)" d="M0 0h640v352H0z"/><path fill="#fff1bf" d="M480 53h28v28h-28z"/>
+<path fill="#bccaa2" d="M0 161v-44h44V98h50v35h65v-22h80v37h49v-30h83V95h60v37h65v-25h66v44h78v201H0z"/>
+<path fill="url(#land)" d="M0 164h640v188H0z"/><path fill="#d2bf8f" d="M316 164h8l76 188H240z"/>
+<g fill="#74684e"><path d="M95 157h13v115H95zM198 159h8v57h-8zM268 160h5v32h-5zM429 154h9v84h-9zM537 143h17v151h-17zM363 159h5v35h-5z"/></g>
+<g fill="#4e8053"><path d="M53 122h91v72H53zM68 104h63v32H68zM175 137h56v47h-56zM251 149h38v28h-38z"/></g>
+<g fill="#dca9b9"><path d="M403 129h64v55h-64zM416 115h40v23h-40zM496 103h103v83H496zM516 83h61v30h-61zM350 145h32v30h-32z"/></g>
+<g fill="#f1deb0"><path d="M150 255h7v9h-7zM469 284h8v10h-8zM242 218h5v6h-5z"/></g>
+<path fill="#112e3150" d="M0 0h640v70H0z"/><text x="26" y="43" fill="#fff7df" font-size="24" font-family="serif" letter-spacing="4">まっすぐ、どこまでも</text>
+</svg>

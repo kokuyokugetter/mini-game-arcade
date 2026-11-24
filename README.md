@@ -28,6 +28,7 @@
 | ろくろアート | `https://<owner>.github.io/mini-game-arcade/games/pottery-wheel/` |
 | 虫食いメロディー | `https://<owner>.github.io/mini-game-arcade/games/melody-gap/` |
 | pi guesser | `https://<owner>.github.io/mini-game-arcade/games/pi-guesser/` |
+| まっすぐ、どこまでも | `https://<owner>.github.io/mini-game-arcade/games/biome-walk/` |
 | いろのわ | `https://<owner>.github.io/mini-game-arcade/games/color-check/` |
 
 「いろのわ」は色の見え方を観察する独自課題です。色覚異常の検出性能は未検証で、診断や適性判断には使えません。医学文献と実装上の判断・今後の検証条件は [調査メモ](games/color-check/RESEARCH.md) に記録しています。
@@ -53,6 +54,8 @@ python3 serve.py
 ポート 8000 が使用中の場合は `python3 serve.py --port 8001` で起動し、表示された URL を開く。停止は起動したターミナルで `Ctrl+C`。
 
 ## GitHub Pages に公開する手順
+
+ゲームの制作・改修は、ローカル限定等の指定がなければ、[作業ルール](AGENTS.md)に従い、動作確認・独立レビュー・セキュリティ監査・権利チェック・一覧の並び順確認を終えてから既存の公開先へ反映する。重大な問題が残る場合は公開を保留する。
 
 1. GitHub に空の公開リポジトリ `mini-game-arcade` を作る。
 2. `OWNER` を GitHub のユーザー名または組織名に置き換え、ローカルから push する。
